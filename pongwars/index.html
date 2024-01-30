@@ -263,8 +263,10 @@
 			updatedDx *= coeff;
 			updatedDy *= coeff;
 			const speedLim = mix(100, 18, suddenDeathCoeff)
-			updatedDx = clamp(-speedLim, speedLim, updatedDx);
-			updatedDy = clamp(-speedLim, speedLim, updatedDy);
+			const norm = (updatedDx**2 + updatedDy**2)**(1/2)
+			const scalar = Math.max(norm/speedLim, 1)
+			updatedDx *= scalar;
+			updatedDy *= scalar;
 
           }
         }
@@ -274,8 +276,10 @@
 	  const ct = Math.cos(theta);
 	  const st = Math.sin(theta);
 	  if (state[color].boostEnabled) {
-	  	updatedDx = (ct * updatedDx - st * updatedDy)*1.01
-	  	updatedDy = (st * updatedDx + ct * updatedDy)*1.01
+	  	const rotDx = (ct * updatedDx - st * updatedDy);
+	  	const rotDy = (st * updatedDx + ct * updatedDy);
+		updatedDx = rotDx;
+		updatedDy = rotDy;
 	  }
 
       return { dx: updatedDx, dy: updatedDy };
