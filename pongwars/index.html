@@ -1,177 +1,176 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <title>Pong wars | Koen van Gilst</title>
-    <link rel="canonical" href="https://pong-wars.koenvangilst.nl/" />
-    <style>
-      html {
-        height: 100%;
-      }
+	<head>
+		<title>Pong wars | Koen van Gilst</title>
+		<link rel="canonical" href="https://pong-wars.koenvangilst.nl/" />
+		<style>
+			html {
+				height: 100%;
+			}
 
-      body {
-        height: 100%;
-        margin: 0;
-        padding: 0;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        background: linear-gradient(to bottom, #172b36 0%, #d9e8e3 100%);
-      }
+			body {
+				height: 100%;
+				margin: 0;
+				padding: 0;
+				display: flex;
+				justify-content: center;
+				align-items: center;
+				background: linear-gradient(to bottom, #172b36 0%, #d9e8e3 100%);
+			}
 
-      #container {
-        display: flex;
-        width: 100%;
-        max-width: 750px;
-        align-items: center;
-        flex-direction: column;
-        height: 100%;
-      }
+			#container {
+				display: flex;
+				width: 100%;
+				max-width: 750px;
+				align-items: center;
+				flex-direction: column;
+				height: 100%;
+			}
 
-      #pongCanvas {
-        display: block;
-        border-radius: 4px;
-        overflow: hidden;
-        width: 100%;
-        margin-top: auto;
-        box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
-      }
+			#pongCanvas {
+				display: block;
+				border-radius: 4px;
+				overflow: hidden;
+				width: 100%;
+				margin-top: auto;
+				box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+			}
 
-      #score {
-        font-family: monospace;
-        margin-top: 30px;
-        font-size: 20px;
-        padding-left: 20px;
-        color: #172b36;
-      }
+			#score {
+				font-family: monospace;
+				margin-top: 30px;
+				font-size: 20px;
+				padding-left: 20px;
+				color: #172b36;
+			}
 
-      #made {
-        font-family: monospace;
-        margin-top: auto;
-        margin-bottom: 20px;
-        font-size: 12px;
-        padding-left: 20px;
-      }
+			#made {
+				font-family: monospace;
+				margin-top: auto;
+				margin-bottom: 20px;
+				font-size: 12px;
+				padding-left: 20px;
+			}
 
-      #made a {
-        color: #172b36;
-      }
-    </style>
-  </head>
+			#made a {
+				color: #172b36;
+			}
+		</style>
+	</head>
 
-  <body>
-    <div id="container">
-      <canvas id="pongCanvas" width="800" height="800"></canvas>
-      <div id="score"></div>
-      <p id="made">
-        made by <a href="https://koenvangilst.nl">Koen van Gilst</a> | source on
-        <a href="https://github.com/vnglst/pong-wars">github</a>
-      </p>
-    </div>
-  </body>
+	<body>
+		<div id="container">
+			<canvas id="pongCanvas" width="800" height="800"></canvas>
+			<div id="score"></div>
+			<p id="made">
+				made by <a href="https://koenvangilst.nl">Koen van Gilst</a> | source on
+				<a href="https://github.com/vnglst/pong-wars">github</a>
+			</p>
+		</div>
+	</body>
 
-  <script>
-    // Based on: https://github.com/vnglst/pong-wars
-    // Idea for Pong wars: https://twitter.com/nicolasdnl/status/1749715070928433161
+	<script>
+		// Based on: https://github.com/vnglst/pong-wars
+		// Idea for Pong wars: https://twitter.com/nicolasdnl/status/1749715070928433161
 
-    const canvas = document.getElementById("pongCanvas");
-    const ctx = canvas.getContext("2d");
-    const scoreElement = document.getElementById("score");
+		const canvas = document.getElementById("pongCanvas");
+		const ctx = canvas.getContext("2d");
+		const scoreElement = document.getElementById("score");
 	const startTime = new Date();
 	var suddenDeathCoeff = 0;
 
-    const teams = [
-      {
-        name: "red",
-        color: "#ff5555",
-        backgroundColor: "#aa0000",
-        x: 256,
-        y: 256,
-        dx: 8,
-        dy: 8,
-        score: 0,
-      },
-      {
-        name: "blue",
-        color: "#5555ff",
-        backgroundColor: "#0000aa",
-        x: 768,
-        y: 256,
-        dx: -8,
-        dy: 8,
-        score: 0,
-      },
-      {
-        name: "green",
-        color: "#a7f070",
-        backgroundColor: "#00aa00",
-        x: 256,
-        y: 768,
-        dx: 8,
-        dy: -8,
-        score: 0,
-      },
-      {
-        name: "yellow",
-        color: "#ffff55",
-        backgroundColor: "#aa5500",
-        x: 768,
-        y: 768,
-        dx: -8,
-        dy: -8,
-        score: 0,
-      },
-      {
-        name: "white",
-        color: "#ffffff",
-        backgroundColor: "#aaaaaa",
-        x: 400,
-        y: 768,
-        dx: -9,
-        dy: -9,
-        score: 0,
-      },
-      {
-        name: "black",
-        color: "#333333",
-        backgroundColor: "#000000",
-        x: 400,
-        y: 300,
-        dx: -8,
-        dy: -8,
-        score: 0,
-      },
-      {
-        name: "ourple",
-        color: "#dd33dd",
-        backgroundColor: "#aa00aa",
-        x: 400,
-        y: 768,
-        dx: -8,
-        dy: -8,
-        score: 0,
-      },
-      {
-        name: "gray",
-        color: "#dddddd",
-        backgroundColor: "#333333",
-        x: 400,
-        y: 768,
-        dx: -8,
-        dy: -8,
-        score: 0,
-      },
-    ];
+		const teams = [
+			{
+				name: "red",
+				color: "#ff5555",
+				backgroundColor: "#aa0000",
+				x: 256,
+				y: 256,
+				dx: 8,
+				dy: 8,
+				score: 0,
+			},
+			{
+				name: "blue",
+				color: "#5555ff",
+				backgroundColor: "#200199",
+				x: 768,
+				y: 256,
+				dx: -8,
+				dy: 8,
+				score: 0,
+			},
+			{
+				name: "green",
+				color: "#a7f070",
+				backgroundColor: "#00aa00",
+				x: 256,
+				y: 768,
+				dx: 8,
+				dy: -8,
+				score: 0,
+			},
+			{
+				name: "yellow",
+				color: "#ffff55",
+				backgroundColor: "#aa5500",
+				x: 768,
+				y: 768,
+				dx: -8,
+				dy: -8,
+				score: 0,
+			},
+			{
+				name: "white",
+				color: "#ffffff",
+				backgroundColor: "#aaaaaa",
+				x: 400,
+				y: 768,
+				dx: -9,
+				dy: -9,
+				score: 0,
+			},
+			{
+				name: "black",
+				color: "#333333",
+				backgroundColor: "#000000",
+				x: 400,
+				y: 300,
+				dx: -8,
+				dy: -8,
+				score: 0,
+			},
+			{
+				name: "ourple",
+				color: "#dd33dd",
+				backgroundColor: "#aa00aa",
+				x: 400,
+				y: 768,
+				dx: -8,
+				dy: -8,
+				score: 0,
+			},
+			{
+				name: "gray",
+				color: "#dddddd",
+				backgroundColor: "#333333",
+				x: 400,
+				y: 768,
+				dx: -8,
+				dy: -8,
+				score: 0,
+			},
+		];
 
 	var state = teams.map((team) => ({
 		elim: false,
-		boost: 1,
 		boostEnabled: false,
 	}))
 
-    const squareSize = 16;
-    const numSquaresX = canvas.width / squareSize;
-    const numSquaresY = canvas.height / squareSize;
-    let squares = [];
+		const squareSize = 16;
+		const numSquaresX = canvas.width / squareSize;
+		const numSquaresY = canvas.height / squareSize;
+		let squares = [];
 
 	document.addEventListener("keydown", (event) => {
 		const key = parseInt(event.key)
@@ -184,17 +183,17 @@
 		state[key].boostEnabled = false;
 	})
 
-    for (let i = 0; i < numSquaresX; i++) {
-      squares[i] = [];
-	  const t = randInt(0, teams.length-1);
-      for (let j = 0; j < numSquaresY; j++) {
-        squares[i][j] = t;
-      }
-    }
+		for (let i = 0; i < numSquaresX; i++) {
+			squares[i] = [];
+		const t = randInt(0, teams.length-1);
+			for (let j = 0; j < numSquaresY; j++) {
+				squares[i][j] = t;
+			}
+		}
 
-    function randomNum(min, max) {
-      return Math.random() * (max - min) + min;
-    }
+		function randomNum(min, max) {
+			return Math.random() * (max - min) + min;
+		}
 
 	function randInt(min, max) {
 		return Math.floor(randomNum(min, max+1))
@@ -204,24 +203,24 @@
 		return ((new Date()) - startTime)/1000
 	}
 
-    updateScoreElement();
+		updateScoreElement();
 
-    function drawBall(x, y, color) {
-      ctx.beginPath();
-      ctx.arc(x, y, squareSize / 2, 0, Math.PI * 2, false);
-      ctx.fillStyle = color;
-      ctx.fill();
-      ctx.closePath();
-    }
+		function drawBall(x, y, color) {
+			ctx.beginPath();
+			ctx.arc(x, y, squareSize / 2, 0, Math.PI * 2, false);
+			ctx.fillStyle = color;
+			ctx.fill();
+			ctx.closePath();
+		}
 
-    function drawSquares() {
-      for (let i = 0; i < numSquaresX; i++) {
-        for (let j = 0; j < numSquaresY; j++) {
-          ctx.fillStyle = teams[squares[i][j]].backgroundColor;
-          ctx.fillRect(i * squareSize, j * squareSize, squareSize, squareSize);
-        }
-      }
-    }
+		function drawSquares() {
+			for (let i = 0; i < numSquaresX; i++) {
+				for (let j = 0; j < numSquaresY; j++) {
+					ctx.fillStyle = teams[squares[i][j]].backgroundColor;
+					ctx.fillRect(i * squareSize, j * squareSize, squareSize, squareSize);
+				}
+			}
+		}
 
 	function clamp(min, max, num) {
 		return Math.min(max, Math.max(min, num))
@@ -231,115 +230,132 @@
 		return v*x + (1-v)*y;
 	}
 
-    function updateSquareAndBounce(x, y, dx, dy, color) {
-	  if (state[color].elim) return
-	  if (Math.max(Math.abs(dx), Math.abs(dy)) < 0.02) state[color].elim = true
-      let updatedDx = dx;
-      let updatedDy = dy;
+	function updateSquareAndBounce(x, y, dx, dy, color) {
+		if (state[color].elim) return
+		if (Math.max(Math.abs(dx), Math.abs(dy)) < 0.02) state[color].elim = true
 
-      // Check multiple points around the ball's circumference
-      for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 4) {
-        let checkX = x + Math.cos(angle) * (squareSize / 2);
-        let checkY = y + Math.sin(angle) * (squareSize / 2);
+		if (Math.min(x, y) < 0 || isNaN(x) || isNaN(y)) {
+			console.log(`warped ${teams[color].name}`)
+			teams[color].x = canvas.width * 0.1;
+			teams[color].y = canvas.height * 0.1;
+			dx = 4;
+			dy = 4;
+		}
 
-        let i = Math.floor(checkX / squareSize);
-        let j = Math.floor(checkY / squareSize);
+		if (x > canvas.width || y > canvas.height) {
+			console.log(`warped ${teams[color].name}`)
+			teams[color].x = canvas.width * 0.9;
+			teams[color].y = canvas.height * 0.9;
+			dx = -4;
+			dy = -4;
+		}
 
-        if (i >= 0 && i < numSquaresX && j >= 0 && j < numSquaresY) {
-          if (squares[i][j] !== color) {
-            squares[i][j] = color;
+		let updatedDx = dx;
+		let updatedDy = dy;
 
-            // Determine bounce direction based on the angle
-            if (Math.abs(Math.cos(angle)) > Math.abs(Math.sin(angle))) {
-              updatedDx = -updatedDx;
-            } else {
-              updatedDy = -updatedDy;
-            }
+		// Check multiple points around the ball's circumference
+		for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 4) {
+			let checkX = x + Math.cos(angle) * (squareSize / 2);
+			let checkY = y + Math.sin(angle) * (squareSize / 2);
 
-            updatedDx += randomNum(-0.15, mix(0.153, 0.15, suddenDeathCoeff));
-            updatedDy += randomNum(-0.15, 0.15);
-			const nTeams = state.map(t => !t.elim).filter(Boolean).length
-			const coeff = Math.min((teams[color].score/(squares.length**2/nTeams/mix(1.2, 4, suddenDeathCoeff))), 1.00);
-			updatedDx *= coeff;
-			updatedDy *= coeff;
-			const speedLim = mix(100, 18, suddenDeathCoeff)
-			const norm = (updatedDx**2 + updatedDy**2)**(1/2)
-			const scalar = Math.max(norm/speedLim, 1)
-			updatedDx *= scalar;
-			updatedDy *= scalar;
+			let i = Math.floor(checkX / squareSize);
+			let j = Math.floor(checkY / squareSize);
 
-          }
-        }
-      }
+			if (i >= 0 && i < numSquaresX && j >= 0 && j < numSquaresY) {
+				if (squares[i][j] !== color) {
+					squares[i][j] = color;
 
-	  const theta = (Math.PI/180)*10;
-	  const ct = Math.cos(theta);
-	  const st = Math.sin(theta);
-	  if (state[color].boostEnabled) {
-	  	const rotDx = (ct * updatedDx - st * updatedDy);
-	  	const rotDy = (st * updatedDx + ct * updatedDy);
-		updatedDx = rotDx;
-		updatedDy = rotDy;
-	  }
+					// Determine bounce direction based on the angle
+					if (Math.abs(Math.cos(angle)) > Math.abs(Math.sin(angle))) {
+						updatedDx = -updatedDx;
+					} else {
+						updatedDy = -updatedDy;
+					}
 
-      return { dx: updatedDx, dy: updatedDy };
-    }
+					updatedDx += randomNum(-0.15, mix(0.153, 0.15, suddenDeathCoeff));
+					updatedDy += randomNum(-0.15, 0.15);
+					const nTeams = state.map(t => !t.elim).filter(Boolean).length
+					const coeff = Math.min((teams[color].score/(squares.length**2/nTeams/mix(1.2, 4, suddenDeathCoeff))), 1.00);
+					updatedDx *= coeff;
+					updatedDy *= coeff;
+					const speedLim = mix(100, 18, suddenDeathCoeff)
+					const norm = (updatedDx**2 + updatedDy**2)**(1/2)
+					const scalar = Math.max(norm/speedLim, 1)
+					updatedDx *= scalar;
+					updatedDy *= scalar;
 
-    function updateScoreElement() {
-      if (!squares) {
-        return;
-      }
-      teams.forEach((t) => (t.score = 0));
-      for (let i = 0; i < numSquaresX; i++) {
-        for (let j = 0; j < numSquaresY; j++) {
-          teams[squares[i][j]].score++;
-        }
-      }
-      for (let i = 0; i < teams.length; i++) {
-		  if (teams[i].score <= 4) {
-			  state[i].elim = true
-		  }
-	  }
+				}
+			}
+		}
 
-      scoreElement.textContent = teams
-        .map((t) => `${t.name} ${t.score}`)
-			.join(" | ") + (suddenDeathCoeff > 0.1 ? " | sudden death!" : "");
-    }
+		const theta = (Math.PI/180)*10;
+		const ct = Math.cos(theta);
+		const st = Math.sin(theta);
+		if (state[color].boostEnabled) {
+			const rotDx = (ct * updatedDx - st * updatedDy);
+			const rotDy = (st * updatedDx + ct * updatedDy);
+			updatedDx = rotDx;
+			updatedDy = rotDy;
+		}
 
-    function draw() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      drawSquares();
+		return { dx: updatedDx, dy: updatedDy };
+	}
 
-      for (let i = 0; i < teams.length; i++) {
-	    if (state[i].elim) continue
-        const t = teams[i];
-        drawBall(t.x, t.y, t.color);
-        let bounce = updateSquareAndBounce(t.x, t.y, t.dx, t.dy, i);
-        t.dx = bounce.dx;
-        t.dy = bounce.dy;
+	function updateScoreElement() {
+		if (!squares) {
+			return;
+		}
+		teams.forEach((t) => (t.score = 0));
+		for (let i = 0; i < numSquaresX; i++) {
+			for (let j = 0; j < numSquaresY; j++) {
+				teams[squares[i][j]].score++;
+			}
+		}
+		for (let i = 0; i < teams.length; i++) {
+			if (teams[i].score <= 4) {
+				state[i].elim = true
+			}
+		}
 
-        if (
-          t.x + t.dx > canvas.width - squareSize / 2 ||
-          t.x + t.dx < squareSize / 2
-        ) {
-          t.dx = -t.dx;
-        }
-        if (
-          t.y + t.dy > canvas.height - squareSize / 2 ||
-          t.y + t.dy < squareSize / 2
-        ) {
-          t.dy = -t.dy;
-        }
+		scoreElement.textContent = teams
+			.map((t) => `${t.name} ${t.score}`)
+		.join(" | ") + (suddenDeathCoeff > 0.1 ? " | sudden death!" : "");
+	}
 
-        t.x += t.dx;
-        t.y += t.dy;
-      }
+	function draw() {
+		ctx.clearRect(0, 0, canvas.width, canvas.height);
+		drawSquares();
 
-      updateScoreElement();
-	  // suddenDeathCoeff = Math.min((elapsedSec()/60/3)**15, 1);
-      requestAnimationFrame(draw);
-    }
+		for (let i = 0; i < teams.length; i++) {
+		if (state[i].elim) continue
+			const t = teams[i];
+			drawBall(t.x, t.y, t.color);
+			let bounce = updateSquareAndBounce(t.x, t.y, t.dx, t.dy, i);
+			t.dx = bounce.dx;
+			t.dy = bounce.dy;
 
-    requestAnimationFrame(draw);
-  </script>
+			if (
+				t.x + t.dx > canvas.width - squareSize / 2 ||
+				t.x + t.dx < squareSize / 2
+			) {
+				t.dx = -t.dx;
+			}
+			if (
+				t.y + t.dy > canvas.height - squareSize / 2 ||
+				t.y + t.dy < squareSize / 2
+			) {
+				t.dy = -t.dy;
+			}
+
+			t.x += t.dx;
+			t.y += t.dy;
+		}
+
+		updateScoreElement();
+		// suddenDeathCoeff = Math.min((elapsedSec()/60/3)**15, 1);
+		requestAnimationFrame(draw);
+	}
+
+	requestAnimationFrame(draw);
+	</script>
 </html>
