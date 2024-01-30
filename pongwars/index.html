@@ -263,6 +263,15 @@
 
 			if (i >= 0 && i < numSquaresX && j >= 0 && j < numSquaresY) {
 				if (squares[i][j] !== color) {
+					const foreign = squares[i][j];
+					if (state[foreign].elim) {
+						for (let ai = 0; ai < numSquaresX; ai++) {
+							for (let aj = 0; aj < numSquaresY; aj++) {
+								if (squares[ai][aj] == foreign) squares[ai][aj] = color;
+							}
+						}
+					}
+
 					squares[i][j] = color;
 
 					// Determine bounce direction based on the angle
