@@ -21,7 +21,7 @@
 			#container {
 				display: flex;
 				width: 100%;
-				max-width: 750px;
+				max-width: 1000px;
 				align-items: center;
 				flex-direction: column;
 				height: 100%;
@@ -60,7 +60,7 @@
 
 	<body>
 		<div id="container">
-			<canvas id="pongCanvas" width="800" height="800"></canvas>
+			<canvas id="pongCanvas" width="1200" height="800"></canvas>
 			<div id="score"></div>
 			<p id="made">
 				made by <a href="https://koenvangilst.nl">Koen van Gilst</a> | source on
@@ -235,7 +235,7 @@
 		if (Math.max(Math.abs(dx), Math.abs(dy)) < 0.02) state[color].elim = true
 
 		if (Math.min(x, y) < 0 || isNaN(x) || isNaN(y)) {
-			console.log(`warped ${teams[color].name}`)
+			console.warn(`warped ${teams[color].name}`)
 			teams[color].x = canvas.width * 0.1;
 			teams[color].y = canvas.height * 0.1;
 			dx = 4;
@@ -243,7 +243,7 @@
 		}
 
 		if (x > canvas.width || y > canvas.height) {
-			console.log(`warped ${teams[color].name}`)
+			console.warn(`warped ${teams[color].name}`)
 			teams[color].x = canvas.width * 0.9;
 			teams[color].y = canvas.height * 0.9;
 			dx = -4;
@@ -284,12 +284,12 @@
 					updatedDx += randomNum(-0.15, mix(0.153, 0.15, suddenDeathCoeff));
 					updatedDy += randomNum(-0.15, 0.15);
 					const nTeams = state.map(t => !t.elim).filter(Boolean).length
-					const coeff = Math.min((teams[color].score/(squares.length**2/nTeams/mix(1.2, 4, suddenDeathCoeff))), 1.00);
+					const coeff = Math.min((teams[color].score/(numSquaresX*numSquaresY/nTeams/mix(1.2, 4, suddenDeathCoeff))), 1.00);
 					updatedDx *= coeff;
 					updatedDy *= coeff;
-					const speedLim = mix(100, 18, suddenDeathCoeff)
+					const speedLim = mix(30, 18, suddenDeathCoeff)
 					const norm = (updatedDx**2 + updatedDy**2)**(1/2)
-					const scalar = Math.max(norm/speedLim, 1)
+					const scalar = Math.min(speedLim/norm, 1)
 					updatedDx *= scalar;
 					updatedDy *= scalar;
 
