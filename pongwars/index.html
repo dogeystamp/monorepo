@@ -265,6 +265,7 @@
 				if (squares[i][j] !== color) {
 					const foreign = squares[i][j];
 					if (state[foreign].elim) {
+						console.log(`${teams[color].name} claims the remaining territory of ${teams[foreign].name}`)
 						for (let ai = 0; ai < numSquaresX; ai++) {
 							for (let aj = 0; aj < numSquaresY; aj++) {
 								if (squares[ai][aj] == foreign) squares[ai][aj] = color;
