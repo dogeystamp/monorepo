@@ -52,6 +52,12 @@
 				padding-left: 20px;
 			}
 
+			#instr {
+				font-family: monospace;
+				font-size: 12px;
+				padding-left: 20px;
+			}
+
 			#made a {
 				color: #172b36;
 			}
@@ -62,9 +68,15 @@
 		<div id="container">
 			<canvas id="pongCanvas" width="1200" height="800"></canvas>
 			<div id="score"></div>
+			<p id="instr">
+			balls can be controlled with number keys
+			</p>
 			<p id="made">
 				made by <a href="https://koenvangilst.nl">Koen van Gilst</a> | source on
 				<a href="https://github.com/vnglst/pong-wars">github</a>
+				<br>
+				patches from dogeystamp | patched source on
+				<a href="https://github.com/dogeystamp/garbage-monorepo/tree/main/pongwars">github</a>
 			</p>
 		</div>
 	</body>
@@ -73,11 +85,14 @@
 		// Based on: https://github.com/vnglst/pong-wars
 		// Idea for Pong wars: https://twitter.com/nicolasdnl/status/1749715070928433161
 
+		// This code is patched: see https://github.com/dogeystamp/garbage-monorepo/tree/main/pongwars
+		// Main features added are controlling balls and colors being able to die
+
 		const canvas = document.getElementById("pongCanvas");
 		const ctx = canvas.getContext("2d");
 		const scoreElement = document.getElementById("score");
-	const startTime = new Date();
-	var suddenDeathCoeff = 0;
+		const startTime = new Date();
+		var suddenDeathCoeff = 0;
 
 		const teams = [
 			{
@@ -111,7 +126,7 @@
 				score: 0,
 			},
 			{
-				name: "yellow",
+				name: "orange",
 				color: "#ffff55",
 				backgroundColor: "#aa5500",
 				x: 768,
@@ -288,7 +303,7 @@
 					const coeff = Math.min((teams[color].score/(numSquaresX*numSquaresY/nTeams/mix(1.2, 4, suddenDeathCoeff))), 1.00);
 					updatedDx *= coeff;
 					updatedDy *= coeff;
-					const speedLim = mix(30, 18, suddenDeathCoeff)
+					const speedLim = mix(30, 13, suddenDeathCoeff)
 					const norm = (updatedDx**2 + updatedDy**2)**(1/2)
 					const scalar = Math.min(speedLim/norm, 1)
 					updatedDx *= scalar;
@@ -328,7 +343,7 @@
 		}
 
 		scoreElement.textContent = teams
-			.map((t) => `${t.name} ${t.score}`)
+			.map((t, idx) => `(${idx}) ${t.name} ${t.score}`)
 		.join(" | ") + (suddenDeathCoeff > 0.1 ? " | sudden death!" : "");
 	}
 
