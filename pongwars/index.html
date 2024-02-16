@@ -97,8 +97,8 @@
 		const teams = [
 			{
 				name: "red",
-				color: "#ff5555",
-				backgroundColor: "#aa0000",
+				color: "indianred",
+				backgroundColor: "darkred",
 				x: 256,
 				y: 256,
 				dx: 8,
@@ -107,8 +107,8 @@
 			},
 			{
 				name: "blue",
-				color: "#5555ff",
-				backgroundColor: "#200199",
+				color: "blue",
+				backgroundColor: "darkblue",
 				x: 768,
 				y: 256,
 				dx: -8,
@@ -117,8 +117,8 @@
 			},
 			{
 				name: "green",
-				color: "#a7f070",
-				backgroundColor: "#00aa00",
+				color: "green",
+				backgroundColor: "darkgreen",
 				x: 256,
 				y: 768,
 				dx: 8,
@@ -127,8 +127,8 @@
 			},
 			{
 				name: "orange",
-				color: "#ffff55",
-				backgroundColor: "#aa5500",
+				color: "coral",
+				backgroundColor: "chocolate",
 				x: 768,
 				y: 768,
 				dx: -8,
@@ -137,8 +137,8 @@
 			},
 			{
 				name: "white",
-				color: "#ffffff",
-				backgroundColor: "#aaaaaa",
+				color: "white",
+				backgroundColor: "gainsboro",
 				x: 400,
 				y: 768,
 				dx: -9,
@@ -148,7 +148,7 @@
 			{
 				name: "black",
 				color: "#333333",
-				backgroundColor: "#000000",
+				backgroundColor: "black",
 				x: 400,
 				y: 300,
 				dx: -8,
@@ -157,8 +157,8 @@
 			},
 			{
 				name: "ourple",
-				color: "#dd33dd",
-				backgroundColor: "#aa00aa",
+				color: "violet",
+				backgroundColor: "purple",
 				x: 400,
 				y: 768,
 				dx: -8,
@@ -167,7 +167,7 @@
 			},
 			{
 				name: "gray",
-				color: "#dddddd",
+				color: "gray",
 				backgroundColor: "#333333",
 				x: 400,
 				y: 768,
@@ -200,8 +200,8 @@
 
 		for (let i = 0; i < numSquaresX; i++) {
 			squares[i] = [];
-		const t = randInt(0, teams.length-1);
 			for (let j = 0; j < numSquaresY; j++) {
+				const t = randInt(0, teams.length-1);
 				squares[i][j] = t;
 			}
 		}
