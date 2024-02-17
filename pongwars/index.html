@@ -265,8 +265,16 @@
 			dy = -4;
 		}
 
-		let updatedDx = dx;
-		let updatedDy = dy;
+		const nTeams = state.map(t => !t.elim).filter(Boolean).length
+
+		// death coefficient (if not enough territory, slow down)
+		const coeff = Math.min((teams[color].score/(numSquaresX*numSquaresY/nTeams/mix(1.2, 4, suddenDeathCoeff))), 1.00);
+
+		// death coefficient when no collision
+		const vacuumCoeff = coeff**(0.01);
+
+		let updatedDx = dx * vacuumCoeff;
+		let updatedDy = dy * vacuumCoeff;
 
 		// Check multiple points around the ball's circumference
 		for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 4) {
@@ -299,8 +307,6 @@
 
 					updatedDx += randomNum(-0.15, mix(0.153, 0.15, suddenDeathCoeff));
 					updatedDy += randomNum(-0.15, 0.15);
-					const nTeams = state.map(t => !t.elim).filter(Boolean).length
-					const coeff = Math.min((teams[color].score/(numSquaresX*numSquaresY/nTeams/mix(1.2, 4, suddenDeathCoeff))), 1.00);
 					updatedDx *= coeff;
 					updatedDy *= coeff;
 					const speedLim = mix(30, 13, suddenDeathCoeff)
