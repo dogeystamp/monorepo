@@ -91,7 +91,8 @@
 		const canvas = document.getElementById("pongCanvas");
 		const ctx = canvas.getContext("2d");
 		const scoreElement = document.getElementById("score");
-		const startTime = new Date();
+
+		var suddenDeathStart = null;
 		var suddenDeathCoeff = 0;
 
 		const teams = [
@@ -215,7 +216,7 @@
 	}
 
 	function elapsedSec() {
-		return ((new Date()) - startTime)/1000
+		return ((new Date()) - suddenDeathStart)/1000
 	}
 
 		updateScoreElement();
@@ -245,9 +246,13 @@
 		return v*x + (1-v)*y;
 	}
 
+	var nTeams = teams.length;
+
 	function updateSquareAndBounce(x, y, dx, dy, color) {
 		if (state[color].elim) return
 		if (Math.max(Math.abs(dx), Math.abs(dy)) < 0.02) state[color].elim = true
+
+		nTeams = state.map(t => !t.elim).filter(Boolean).length
 
 		if (Math.min(x, y) < 0 || isNaN(x) || isNaN(y)) {
 			console.warn(`warped ${teams[color].name}`)
@@ -264,8 +269,6 @@
 			dx = -4;
 			dy = -4;
 		}
-
-		const nTeams = state.map(t => !t.elim).filter(Boolean).length
 
 		// death coefficient (if not enough territory, slow down)
 		const coeff = Math.min((teams[color].score/(numSquaresX*numSquaresY/nTeams/mix(1.2, 4, suddenDeathCoeff))), 1.00);
@@ -348,9 +351,16 @@
 			}
 		}
 
-		scoreElement.textContent = teams
-			.map((t, idx) => `(${idx}) ${t.name} ${t.score}`)
-		.join(" | ") + (suddenDeathCoeff > 0.1 ? " | sudden death!" : "");
+		if (nTeams > 1) {
+			scoreElement.textContent = teams
+				.map((t, idx) => `(${idx}) ${t.name} ${t.score}`)
+				.filter((t, idx) => !state[idx].elim)
+			.join(" | ") + (suddenDeathCoeff > 0.1 ? " | sudden death!" : "");
+		} else {
+			scoreElement.textContent = teams
+				.filter((t, idx) => !state[idx].elim)
+				.map((t) => `${t.name} 👑 wins`)
+		}
 	}
 
 	function draw() {
@@ -383,7 +393,11 @@
 		}
 
 		updateScoreElement();
-		// suddenDeathCoeff = Math.min((elapsedSec()/60/3)**15, 1);
+		if (suddenDeathStart !== null) {
+			suddenDeathCoeff = Math.min((elapsedSec()/60/5)**15, 1);
+		} else if (nTeams <= 3) {
+			suddenDeathStart = new Date();
+		}
 		requestAnimationFrame(draw);
 	}
 
