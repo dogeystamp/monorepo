@@ -231,8 +231,9 @@
 			}
 
 			for (let i = 0; i < teams.length; i++) {
-				teams[i].dx = 5 * randInt(-1, 1);
-				teams[i].dy = 5;
+				const angle = randomNum(0, 2 * Math.PI);
+				teams[i].dx = 5 * Math.cos(angle);
+				teams[i].dy = 5 * Math.sin(angle);
 			}
 		}
 
