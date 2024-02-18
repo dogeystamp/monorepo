@@ -82,111 +82,108 @@
 	</body>
 
 	<script>
-		// Based on: https://github.com/vnglst/pong-wars
-		// Idea for Pong wars: https://twitter.com/nicolasdnl/status/1749715070928433161
+	// Based on: https://github.com/vnglst/pong-wars
+	// Idea for Pong wars: https://twitter.com/nicolasdnl/status/1749715070928433161
 
-		// This code is patched: see https://github.com/dogeystamp/garbage-monorepo/tree/main/pongwars
-		// Main features added are controlling balls and colors being able to die
+	// This code is patched: see https://github.com/dogeystamp/garbage-monorepo/tree/main/pongwars
+	// Main features added are controlling balls and colors being able to die
 
-		const canvas = document.getElementById("pongCanvas");
-		const ctx = canvas.getContext("2d");
-		const scoreElement = document.getElementById("score");
+	const canvas = document.getElementById("pongCanvas");
+	const ctx = canvas.getContext("2d");
+	const scoreElement = document.getElementById("score");
 
-		var suddenDeathStart = null;
-		var suddenDeathCoeff = 0;
+	var suddenDeathStart = null;
+	var suddenDeathCoeff = 0;
 
-		const teams = [
-			{
-				name: "red",
-				color: "indianred",
-				backgroundColor: "darkred",
-				x: 256,
-				y: 256,
-				dx: 8,
-				dy: 8,
-				score: 0,
-			},
-			{
-				name: "blue",
-				color: "blue",
-				backgroundColor: "darkblue",
-				x: 768,
-				y: 256,
-				dx: -8,
-				dy: 8,
-				score: 0,
-			},
-			{
-				name: "green",
-				color: "green",
-				backgroundColor: "darkgreen",
-				x: 256,
-				y: 768,
-				dx: 8,
-				dy: -8,
-				score: 0,
-			},
-			{
-				name: "orange",
-				color: "coral",
-				backgroundColor: "chocolate",
-				x: 768,
-				y: 768,
-				dx: -8,
-				dy: -8,
-				score: 0,
-			},
-			{
-				name: "white",
-				color: "white",
-				backgroundColor: "gainsboro",
-				x: 400,
-				y: 768,
-				dx: -9,
-				dy: -9,
-				score: 0,
-			},
-			{
-				name: "black",
-				color: "#333333",
-				backgroundColor: "black",
-				x: 400,
-				y: 300,
-				dx: -8,
-				dy: -8,
-				score: 0,
-			},
-			{
-				name: "ourple",
-				color: "violet",
-				backgroundColor: "purple",
-				x: 400,
-				y: 768,
-				dx: -8,
-				dy: -8,
-				score: 0,
-			},
-			{
-				name: "gray",
-				color: "gray",
-				backgroundColor: "#333333",
-				x: 400,
-				y: 768,
-				dx: -8,
-				dy: -8,
-				score: 0,
-			},
-		];
+	const teams = [
+		{
+			name: "red",
+			color: "indianred",
+			backgroundColor: "darkred",
+			x: 256,
+			y: 256,
+			dx: 8,
+			dy: 8,
+			score: 0,
+		},
+		{
+			name: "blue",
+			color: "blue",
+			backgroundColor: "darkblue",
+			x: 768,
+			y: 256,
+			dx: -8,
+			dy: 8,
+			score: 0,
+		},
+		{
+			name: "green",
+			color: "green",
+			backgroundColor: "darkgreen",
+			x: 256,
+			y: 768,
+			dx: 8,
+			dy: -8,
+			score: 0,
+		},
+		{
+			name: "orange",
+			color: "coral",
+			backgroundColor: "chocolate",
+			x: 768,
+			y: 768,
+			dx: -8,
+			dy: -8,
+			score: 0,
+		},
+		{
+			name: "white",
+			color: "white",
+			backgroundColor: "gainsboro",
+			x: 400,
+			y: 768,
+			dx: -9,
+			dy: -9,
+			score: 0,
+		},
+		{
+			name: "black",
+			color: "#333333",
+			backgroundColor: "black",
+			x: 400,
+			y: 300,
+			dx: -8,
+			dy: -8,
+			score: 0,
+		},
+		{
+			name: "ourple",
+			color: "violet",
+			backgroundColor: "purple",
+			x: 400,
+			y: 768,
+			dx: -8,
+			dy: -8,
+			score: 0,
+		},
+		{
+			name: "gray",
+			color: "gray",
+			backgroundColor: "#333333",
+			x: 400,
+			y: 768,
+			dx: -8,
+			dy: -8,
+			score: 0,
+		},
+	];
 
-	var state = teams.map((team) => ({
-		elim: false,
-		boostEnabled: false,
-	}))
+	var state = {}
 
-		const squareSize = 16;
-		const numSquaresX = canvas.width / squareSize;
-		const numSquaresY = canvas.height / squareSize;
-		let squares = [];
+	const squareSize = 16;
+	const numSquaresX = canvas.width / squareSize;
+	const numSquaresY = canvas.height / squareSize;
+	let squares = [];
 
 	document.addEventListener("keydown", (event) => {
 		const key = parseInt(event.key)
@@ -199,6 +196,8 @@
 		state[key].boostEnabled = false;
 	})
 
+	function initialState() {
+		// base noise pattern (failsafe in case the grid doesn't cover some part)
 		for (let i = 0; i < numSquaresX; i++) {
 			squares[i] = [];
 			for (let j = 0; j < numSquaresY; j++) {
@@ -207,9 +206,46 @@
 			}
 		}
 
-		function randomNum(min, max) {
-			return Math.random() * (max - min) + min;
+		const enableGrid = true;
+		if (enableGrid) {
+			const gridW = 4;
+			const gridH = 2;
+			for (let i = 0; i < gridW; i++) {
+				for (let j = 0; j < gridH; j++) {
+					const gridIdx = j * gridW + i;
+					const t = (gridIdx < teams.length) ? gridIdx : null;
+
+					for (let x = Math.floor(i/gridW*numSquaresX); x < Math.floor((i+1)/gridW*numSquaresX); x++) {
+						for (let y = Math.floor(j/gridH*numSquaresY); y < Math.floor((j+1)/gridH*numSquaresY); y++) {
+							if (t !== null) {
+								squares[x][y] = t;
+							}
+						}
+					}
+
+					if (t !== null) {
+						teams[t].x = Math.floor((i+0.5)/gridW*canvas.width);
+						teams[t].y = Math.floor((j+0.5)/gridH*canvas.height);
+					}
+				}
+			}
+
+			for (let i = 0; i < teams.length; i++) {
+				teams[i].dx = 5 * randInt(-1, 1);
+				teams[i].dy = 5;
+			}
 		}
+
+		state = teams.map((team) => ({
+			elim: false,
+			boostEnabled: false,
+		}))
+	}
+	initialState();
+
+	function randomNum(min, max) {
+		return Math.random() * (max - min) + min;
+	}
 
 	function randInt(min, max) {
 		return Math.floor(randomNum(min, max+1))
