@@ -100,81 +100,41 @@
 			name: "red",
 			color: "indianred",
 			backgroundColor: "darkred",
-			x: 256,
-			y: 256,
-			dx: 8,
-			dy: 8,
-			score: 0,
 		},
 		{
 			name: "blue",
 			color: "blue",
 			backgroundColor: "darkblue",
-			x: 768,
-			y: 256,
-			dx: -8,
-			dy: 8,
-			score: 0,
 		},
 		{
 			name: "green",
 			color: "green",
 			backgroundColor: "darkgreen",
-			x: 256,
-			y: 768,
-			dx: 8,
-			dy: -8,
-			score: 0,
 		},
 		{
 			name: "orange",
 			color: "coral",
 			backgroundColor: "chocolate",
-			x: 768,
-			y: 768,
-			dx: -8,
-			dy: -8,
-			score: 0,
 		},
 		{
 			name: "white",
 			color: "white",
 			backgroundColor: "gainsboro",
-			x: 400,
-			y: 768,
-			dx: -9,
-			dy: -9,
-			score: 0,
 		},
 		{
 			name: "black",
 			color: "#333333",
 			backgroundColor: "black",
-			x: 400,
-			y: 300,
-			dx: -8,
-			dy: -8,
-			score: 0,
 		},
 		{
 			name: "ourple",
 			color: "violet",
 			backgroundColor: "purple",
-			x: 400,
-			y: 768,
-			dx: -8,
-			dy: -8,
-			score: 0,
 		},
 		{
 			name: "gray",
 			color: "gray",
 			backgroundColor: "#333333",
-			x: 400,
-			y: 768,
-			dx: -8,
-			dy: -8,
-			score: 0,
 		},
 	];
 
@@ -197,6 +157,16 @@
 	})
 
 	function initialState() {
+		state = teams.map((team) => ({
+			elim: false,
+			boostEnabled: false,
+			x: 0,
+			y: 0,
+			dx: 0,
+			dy: 0,
+			score: 0,
+		}))
+
 		// base noise pattern (failsafe in case the grid doesn't cover some part)
 		for (let i = 0; i < numSquaresX; i++) {
 			squares[i] = [];
@@ -224,23 +194,18 @@
 					}
 
 					if (t !== null) {
-						teams[t].x = Math.floor((i+0.5)/gridW*canvas.width);
-						teams[t].y = Math.floor((j+0.5)/gridH*canvas.height);
+						state[t].x = Math.floor((i+0.5)/gridW*canvas.width);
+						state[t].y = Math.floor((j+0.5)/gridH*canvas.height);
 					}
 				}
 			}
 
 			for (let i = 0; i < teams.length; i++) {
 				const angle = randomNum(0, 2 * Math.PI);
-				teams[i].dx = 8 * Math.cos(angle);
-				teams[i].dy = 8 * Math.sin(angle);
+				state[i].dx = 8 * Math.cos(angle);
+				state[i].dy = 8 * Math.sin(angle);
 			}
 		}
-
-		state = teams.map((team) => ({
-			elim: false,
-			boostEnabled: false,
-		}))
 	}
 	initialState();
 
@@ -293,22 +258,22 @@
 
 		if (Math.min(x, y) < 0 || isNaN(x) || isNaN(y)) {
 			console.warn(`warped ${teams[color].name}`)
-			teams[color].x = canvas.width * 0.1;
-			teams[color].y = canvas.height * 0.1;
+			state[color].x = canvas.width * 0.1;
+			state[color].y = canvas.height * 0.1;
 			dx = 4;
 			dy = 4;
 		}
 
 		if (x > canvas.width || y > canvas.height) {
 			console.warn(`warped ${teams[color].name}`)
-			teams[color].x = canvas.width * 0.9;
-			teams[color].y = canvas.height * 0.9;
+			state[color].x = canvas.width * 0.9;
+			state[color].y = canvas.height * 0.9;
 			dx = -4;
 			dy = -4;
 		}
 
 		// death coefficient (if not enough territory, slow down)
-		const coeff = Math.min((teams[color].score/(numSquaresX*numSquaresY/nTeams/mix(1.2, 4, suddenDeathCoeff))), 1.00);
+		const coeff = Math.min((state[color].score/(numSquaresX*numSquaresY/nTeams/mix(1.2, 4, suddenDeathCoeff))), 1.00);
 
 		// death coefficient when no collision
 		const vacuumCoeff = coeff**(0.01);
@@ -376,21 +341,21 @@
 		if (!squares) {
 			return;
 		}
-		teams.forEach((t) => (t.score = 0));
+		state.forEach((t) => (t.score = 0));
 		for (let i = 0; i < numSquaresX; i++) {
 			for (let j = 0; j < numSquaresY; j++) {
-				teams[squares[i][j]].score++;
+				state[squares[i][j]].score++;
 			}
 		}
 		for (let i = 0; i < teams.length; i++) {
-			if (teams[i].score <= 4) {
+			if (state[i].score <= 4) {
 				state[i].elim = true
 			}
 		}
 
 		if (nTeams > 1) {
 			scoreElement.textContent = teams
-				.map((t, idx) => `(${idx}) ${t.name} ${t.score}`)
+				.map((t, idx) => `(${idx}) ${t.name} ${state[idx].score}`)
 				.filter((t, idx) => !state[idx].elim)
 			.join(" | ") + (suddenDeathCoeff > 0.1 ? " | sudden death!" : "");
 		} else {
@@ -406,8 +371,8 @@
 
 		for (let i = 0; i < teams.length; i++) {
 		if (state[i].elim) continue
-			const t = teams[i];
-			drawBall(t.x, t.y, t.color);
+			const t = state[i];
+			drawBall(t.x, t.y, teams[i].color);
 			let bounce = updateSquareAndBounce(t.x, t.y, t.dx, t.dy, i);
 			t.dx = bounce.dx;
 			t.dy = bounce.dy;
