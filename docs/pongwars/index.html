@@ -145,6 +145,10 @@
 	const numSquaresY = canvas.height / squareSize;
 	let squares = [];
 
+	// matrix of "timestamps" where each square was claimed
+	let squareTaken = [];
+	var squareTime = 0;
+
 	document.addEventListener("keydown", (event) => {
 		const key = parseInt(event.key)
 		if (isNaN(key)) return
@@ -165,14 +169,18 @@
 			dx: 0,
 			dy: 0,
 			score: 0,
+			// how many consecutive contested tiles it has hit
+			conflict: 0,
 		}))
 
 		// base noise pattern (failsafe in case the grid doesn't cover some part)
 		for (let i = 0; i < numSquaresX; i++) {
 			squares[i] = [];
+			squareTaken[i] = [];
 			for (let j = 0; j < numSquaresY; j++) {
 				const t = randInt(0, teams.length-1);
 				squares[i][j] = t;
+				squareTaken[i][j] = squareTime;
 			}
 		}
 
@@ -221,24 +229,24 @@
 		return ((new Date()) - suddenDeathStart)/1000
 	}
 
-		updateScoreElement();
+	updateScoreElement();
 
-		function drawBall(x, y, color) {
-			ctx.beginPath();
-			ctx.arc(x, y, squareSize / 2, 0, Math.PI * 2, false);
-			ctx.fillStyle = color;
-			ctx.fill();
-			ctx.closePath();
-		}
+	function drawBall(x, y, color) {
+		ctx.beginPath();
+		ctx.arc(x, y, squareSize / 2, 0, Math.PI * 2, false);
+		ctx.fillStyle = color;
+		ctx.fill();
+		ctx.closePath();
+	}
 
-		function drawSquares() {
-			for (let i = 0; i < numSquaresX; i++) {
-				for (let j = 0; j < numSquaresY; j++) {
-					ctx.fillStyle = teams[squares[i][j]].backgroundColor;
-					ctx.fillRect(i * squareSize, j * squareSize, squareSize, squareSize);
-				}
+	function drawSquares() {
+		for (let i = 0; i < numSquaresX; i++) {
+			for (let j = 0; j < numSquaresY; j++) {
+				ctx.fillStyle = teams[squares[i][j]].backgroundColor;
+				ctx.fillRect(i * squareSize, j * squareSize, squareSize, squareSize);
 			}
 		}
+	}
 
 	function clamp(min, max, num) {
 		return Math.min(max, Math.max(min, num))
@@ -292,6 +300,31 @@
 			if (i >= 0 && i < numSquaresX && j >= 0 && j < numSquaresY) {
 				if (squares[i][j] !== color) {
 					const foreign = squares[i][j];
+					if (!state[foreign].elim) {
+						// in the event that the ball gets entangled with another on a contested square really long,
+						// have them duel and one of them will win (the one with more territory is more likely to win)
+						if (squareTime == squareTaken[i][j]) {
+							state[color].conflict++;
+							if (state[color].conflict >= 100 && randInt(0, 1) == 1) {
+								const ratio = state[color].score / (state[foreign].score + state[color].score);
+								console.log(`${teams[color].name} and ${teams[foreign].name} start a duel (territory ratio ${ratio.toFixed(2)})`);
+								const val = Math.random();
+								if (val == ratio) {
+									console.log(`nobody wins the duel`);
+								} else if (val < ratio) {
+									console.log(`${teams[color].name} vanquishes ${teams[foreign].name}`);
+									state[foreign].elim = true;
+								} else if (val > ratio) {
+									console.log(`${teams[foreign].name} vanquishes ${teams[color].name}`);
+									state[color].elim = true;
+								}
+								state[color].conflict = 0;
+								state[foreign].conflict = 0;
+							}
+						} else {
+							state[color].conflict = 0;
+						}
+					}
 					if (state[foreign].elim) {
 						console.log(`${teams[color].name} claims the remaining territory of ${teams[foreign].name}`)
 						for (let ai = 0; ai < numSquaresX; ai++) {
@@ -301,6 +334,7 @@
 						}
 					}
 
+					squareTaken[i][j] = squareTime;
 					squares[i][j] = color;
 
 					// Determine bounce direction based on the angle
@@ -369,8 +403,11 @@
 		ctx.clearRect(0, 0, canvas.width, canvas.height);
 		drawSquares();
 
+		squareTime++;
+		squareTime %= 100000;
+
 		for (let i = 0; i < teams.length; i++) {
-		if (state[i].elim) continue
+			if (state[i].elim) continue
 			const t = state[i];
 			drawBall(t.x, t.y, teams[i].color);
 			let bounce = updateSquareAndBounce(t.x, t.y, t.dx, t.dy, i);
@@ -403,6 +440,6 @@
 		requestAnimationFrame(draw);
 	}
 
-	requestAnimationFrame(draw);
+requestAnimationFrame(draw);
 	</script>
 </html>
