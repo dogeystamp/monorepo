@@ -257,12 +257,12 @@
 	}
 
 	var nTeams = teams.length;
+	// NTeams but with ease in to avoid instant deaths
+	var smoothNTeams = nTeams;
 
 	function updateSquareAndBounce(x, y, dx, dy, color) {
 		if (state[color].elim) return
 		if (Math.max(Math.abs(dx), Math.abs(dy)) < 0.02) state[color].elim = true
-
-		nTeams = state.map(t => !t.elim).filter(Boolean).length
 
 		if (Math.min(x, y) < 0 || isNaN(x) || isNaN(y)) {
 			console.warn(`warped ${teams[color].name}`)
@@ -281,7 +281,10 @@
 		}
 
 		// death coefficient (if not enough territory, slow down)
-		const coeff = Math.min((state[color].score/(numSquaresX*numSquaresY/nTeams/mix(1.2, 4, suddenDeathCoeff))), 1.00);
+		var coeff = Math.min((state[color].score/(numSquaresX*numSquaresY/smoothNTeams/mix(1.2, 4, suddenDeathCoeff))), 1.00);
+
+		// winners don't slow down
+		if (nTeams === 1) coeff = 1;
 
 		// death coefficient when no collision
 		const vacuumCoeff = coeff**(0.01);
@@ -400,6 +403,14 @@
 	}
 
 	function draw() {
+		nTeams = state.map(t => !t.elim).filter(Boolean).length;
+		
+		// practically inertia (0-1)
+		const smoothCoeff = 0.999;
+
+		smoothNTeams = smoothNTeams * (smoothCoeff) + nTeams * (1 - smoothCoeff);
+		if (isNaN(smoothNTeams)) smoothNTeams = nTeams;
+
 		ctx.clearRect(0, 0, canvas.width, canvas.height);
 		drawSquares();
 
