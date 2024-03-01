@@ -224,6 +224,8 @@
 	}
 
 	function initialState({gridW = 4, gridH = 2, cols = teams.length, canvasW=1200, canvasH=800, squareSize=16} = {}) {
+		ctx.clearRect(0, 0, canvas.width, canvas.height);
+
 		nTeams = cols;
 		smoothNTeams = cols;
 
@@ -286,6 +288,19 @@
 				state[i].dy = 8 * Math.sin(angle);
 			}
 		}
+
+		state.forEach((t) => (t.score = 0));
+		for (let i = 0; i < numSquaresX; i++) {
+			for (let j = 0; j < numSquaresY; j++) {
+				state[squares[i][j]].score++;
+			}
+		}
+
+		for (let i = 0; i < numSquaresX; i++) {
+			for (let j = 0; j < numSquaresY; j++) {
+				drawSquare(i, j);
+			}
+		}
 	}
 
 	switch (params.get("size")) {
@@ -315,6 +330,19 @@
 
 	updateScoreElement();
 
+	function coverBall(x, y) {
+		// draw over the last ball
+		let i = Math.floor(x / squareSize);
+		let j = Math.floor(y / squareSize);
+		for (let checkI = i-1; checkI <= i+1; checkI++) {
+			for (let checkJ = j-1; checkJ <= j+1; checkJ++) {
+				if (checkI >= 0 && checkI < numSquaresX && checkJ >= 0 && checkJ < numSquaresY) {
+					drawSquare(checkI, checkJ);
+				}
+			}
+		}
+	}
+
 	function drawBall(x, y, color) {
 		ctx.beginPath();
 		ctx.arc(x, y, squareSize / 2, 0, Math.PI * 2, false);
@@ -323,13 +351,17 @@
 		ctx.closePath();
 	}
 
-	function drawSquares() {
-		for (let i = 0; i < numSquaresX; i++) {
-			for (let j = 0; j < numSquaresY; j++) {
-				ctx.fillStyle = teams[squares[i][j]].backgroundColor;
-				ctx.fillRect(i * squareSize, j * squareSize, squareSize, squareSize);
-			}
-		}
+	function drawSquare(i, j) {
+		ctx.fillStyle = teams[squares[i][j]].backgroundColor;
+		ctx.fillRect(i * squareSize, j * squareSize, squareSize, squareSize);
+	}
+
+	function takeSquare(i, j, team) {
+		state[team].score++;
+		state[squares[i][j]].score--;
+		squares[i][j] = team;
+		squareTaken[i][j] = squareTime;
+		drawSquare(i, j);
 	}
 
 	function clamp(min, max, num) {
@@ -412,13 +444,12 @@
 						console.log(`${teams[color].name} claims the remaining territory of ${teams[foreign].name}`)
 						for (let ai = 0; ai < numSquaresX; ai++) {
 							for (let aj = 0; aj < numSquaresY; aj++) {
-								if (squares[ai][aj] == foreign) squares[ai][aj] = color;
+								if (squares[ai][aj] == foreign) takeSquare(ai, aj, color);
 							}
 						}
 					}
 
-					squareTaken[i][j] = squareTime;
-					squares[i][j] = color;
+					takeSquare(i, j, color);
 
 					// Determine bounce direction based on the angle
 					if (Math.abs(Math.cos(angle)) > Math.abs(Math.sin(angle))) {
@@ -458,17 +489,6 @@
 		if (!squares) {
 			return;
 		}
-		state.forEach((t) => (t.score = 0));
-		for (let i = 0; i < numSquaresX; i++) {
-			for (let j = 0; j < numSquaresY; j++) {
-				state[squares[i][j]].score++;
-			}
-		}
-		for (let i = 0; i < teams.length; i++) {
-			if (state[i].score <= 4) {
-				state[i].elim = true
-			}
-		}
 
 		if (nTeams > 1) {
 			scoreElement.textContent = teams
@@ -485,6 +505,12 @@
 	}
 
 	function draw() {
+		for (let i = 0; i < teams.length; i++) {
+			if (state[i].score <= 4) {
+				state[i].elim = true
+			}
+		}
+
 		nTeams = state.map(t => !t.elim).filter(Boolean).length;
 		
 		// practically inertia (0-1)
@@ -495,16 +521,12 @@
 
 		threshold = numSquaresX*numSquaresY/smoothNTeams/mix(1.2, 4, suddenDeathCoeff);
 
-		ctx.clearRect(0, 0, canvas.width, canvas.height);
-		drawSquares();
-
 		squareTime++;
 		squareTime %= 100000;
 
 		for (let i = 0; i < teams.length; i++) {
 			if (state[i].elim) continue
 			const t = state[i];
-			drawBall(t.x, t.y, teams[i].color);
 			let bounce = updateSquareAndBounce(t.x, t.y, t.dx, t.dy, i);
 			t.dx = bounce.dx;
 			t.dy = bounce.dy;
@@ -522,8 +544,10 @@
 				t.dy = -t.dy;
 			}
 
+			coverBall(t.x, t.y);
 			t.x += t.dx;
 			t.y += t.dy;
+			drawBall(t.x, t.y, teams[i].color);
 		}
 
 		updateScoreElement();
