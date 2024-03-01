@@ -47,9 +47,15 @@
 			#made {
 				font-family: monospace;
 				margin-top: auto;
-				margin-bottom: 20px;
 				font-size: 12px;
 				padding-left: 20px;
+			}
+
+			#mode {
+				font-family: monospace;
+				font-size: 12px;
+				list-style-type: none;
+				margin-bottom: 20px;
 			}
 
 			#instr {
@@ -69,7 +75,7 @@
 			<canvas id="pongCanvas" width="1200" height="800"></canvas>
 			<div id="score"></div>
 			<p id="instr">
-			balls can be controlled with number keys
+			balls can be controlled with keys shown to the left of their names
 			</p>
 			<p id="made">
 				made by <a href="https://koenvangilst.nl">Koen van Gilst</a> | source on
@@ -78,6 +84,12 @@
 				patches from dogeystamp | patched source on
 				<a href="https://github.com/dogeystamp/garbage-monorepo/tree/main/pongwars">github</a>
 			</p>
+			<div id="mode">
+				change mode:
+				<a class="modeLink" data-mode="normal">normal</a>
+				<a class="modeLink" data-mode="big">big</a>
+				<a class="modeLink" data-mode="small">small</a>
+			</div>
 		</div>
 	</body>
 
@@ -114,7 +126,7 @@
 		{
 			name: "orange",
 			color: "coral",
-			backgroundColor: "chocolate",
+			backgroundColor: "#DD4500",
 		},
 		{
 			name: "white",
@@ -136,33 +148,79 @@
 			color: "gray",
 			backgroundColor: "#333333",
 		},
+		{
+			name: "yellow",
+			color: "yellow",
+			backgroundColor: "goldenrod",
+		},
+		{
+			name: "pink",
+			color: "darksalmon",
+			backgroundColor: "mediumvioletred",
+		},
+		{
+			name: "turquoise",
+			color: "turquoise",
+			backgroundColor: "royalblue",
+		},
+		{
+			name: "salmon",
+			color: "peachpuff",
+			backgroundColor: "salmon",
+		},
 	];
 
 	var state = {}
 
-	const squareSize = 16;
-	const numSquaresX = canvas.width / squareSize;
-	const numSquaresY = canvas.height / squareSize;
+
+	var squareSize = 16;
+	var numSquaresX = canvas.width / squareSize;
+	var numSquaresY = canvas.height / squareSize;
 	let squares = [];
 
 	// matrix of "timestamps" where each square was claimed
 	let squareTaken = [];
 	var squareTime = 0;
 
+	// do not edit without editing the code below for key to idx
+	const idxKeyMap = [..."0123456789abcdefghijklmnopqrstuvwxyz"];
+	function keyToIdx(key) {
+		const keyInt = parseInt(key, 36);
+		if (!isNaN(keyInt) && keyInt < teams.length) return keyInt;
+		return null
+	}
+
 	document.addEventListener("keydown", (event) => {
-		const key = parseInt(event.key)
-		if (isNaN(key)) return
-		state[key].boostEnabled = true;
+		const idx = keyToIdx(event.key)
+		if (idx === null) return
+		state[idx].boostEnabled = true;
 	})
 	document.addEventListener("keyup", (event) => {
-		const key = parseInt(event.key)
-		if (isNaN(key)) return
-		state[key].boostEnabled = false;
+		const idx = keyToIdx(event.key)
+		if (idx === null) return
+		state[idx].boostEnabled = false;
 	})
 
-	function initialState() {
-		state = teams.map((team) => ({
-			elim: false,
+	const params = new URLSearchParams(window.location.search);
+
+	const modeLinks = document.getElementsByClassName("modeLink");
+	for (let i = 0; i < modeLinks.length; i++) {
+		let loc = new URL(window.location);
+		loc.searchParams.set("size", modeLinks[i].getAttribute("data-mode"));
+		modeLinks[i].href = loc.href;
+	}
+
+	function initialState({gridW = 4, gridH = 2, cols = teams.length, canvasW=1200, canvasH=800, squareSize=16} = {}) {
+		canvas.width = canvasW;
+		canvas.height = canvasH;
+		window.squareSize = squareSize;
+
+		numSquaresX = canvas.width / squareSize;
+		numSquaresY = canvas.height / squareSize;
+
+		state = {};
+		state = teams.map((team, idx) => ({
+			elim: idx >= cols,
 			boostEnabled: false,
 			x: 0,
 			y: 0,
@@ -171,7 +229,7 @@
 			score: 0,
 			// how many consecutive contested tiles it has hit
 			conflict: 0,
-		}))
+		}));
 
 		// base noise pattern (failsafe in case the grid doesn't cover some part)
 		for (let i = 0; i < numSquaresX; i++) {
@@ -186,15 +244,13 @@
 
 		const enableGrid = true;
 		if (enableGrid) {
-			const gridW = 4;
-			const gridH = 2;
 			for (let i = 0; i < gridW; i++) {
 				for (let j = 0; j < gridH; j++) {
 					const gridIdx = j * gridW + i;
 					const t = (gridIdx < teams.length) ? gridIdx : null;
 
-					for (let x = Math.floor(i/gridW*numSquaresX); x < Math.floor((i+1)/gridW*numSquaresX); x++) {
-						for (let y = Math.floor(j/gridH*numSquaresY); y < Math.floor((j+1)/gridH*numSquaresY); y++) {
+					for (let x = Math.floor(i/gridW*numSquaresX); x < Math.ceil((i+1)/gridW*numSquaresX); x++) {
+						for (let y = Math.floor(j/gridH*numSquaresY); y < Math.ceil((j+1)/gridH*numSquaresY); y++) {
 							if (t !== null) {
 								squares[x][y] = t;
 							}
@@ -215,7 +271,19 @@
 			}
 		}
 	}
-	initialState();
+
+	switch (params.get("size")) {
+		case "big":
+			initialState({gridW: 4, gridH: 3, cols: 12, canvasW: 1600, canvasH: 1000});
+			break;
+		case "small":
+			initialState({gridW: 2, gridH: 1, cols: 2, canvasW: 600, canvasH: 600, squareSize: 25});
+			break;
+		case "normal":
+		default:
+			initialState({gridW: 4, gridH: 2, cols: 8});
+			break;
+	}
 
 	function randomNum(min, max) {
 		return Math.random() * (max - min) + min;
@@ -392,7 +460,7 @@
 
 		if (nTeams > 1) {
 			scoreElement.textContent = teams
-				.map((t, idx) => `(${idx}) ${t.name} ${state[idx].score}`)
+				.map((t, idx) => `(${idxKeyMap[idx]}) ${t.name} ${state[idx].score}`)
 				.filter((t, idx) => !state[idx].elim)
 			.join(" | ") + (suddenDeathCoeff > 0.1 ? " | sudden death!" : "");
 		} else {
@@ -451,6 +519,6 @@
 		requestAnimationFrame(draw);
 	}
 
-requestAnimationFrame(draw);
+	requestAnimationFrame(draw);
 	</script>
 </html>
