@@ -509,6 +509,10 @@
 			if (state[i].score <= 4) {
 				state[i].elim = true
 			}
+			if (state[i].score > 0 && state[i].elim) {
+				// draw over dead balls
+				coverBall(state[i].x, state[i].y)
+			}
 		}
 
 		nTeams = state.map(t => !t.elim).filter(Boolean).length;
