@@ -94,6 +94,7 @@
 				<a class="modeLink" data-mode="normal">normal</a>
 				<a class="modeLink" data-mode="big">big</a>
 				<a class="modeLink" data-mode="small">small</a>
+				<a class="modeLink" data-mode="massive">massive</a>
 			</div>
 		</div>
 	</body>
@@ -174,6 +175,46 @@
 			color: "peachpuff",
 			backgroundColor: "salmon",
 		},
+		{
+			name: "light-grey",
+			color: "darkgrey",
+			backgroundColor: "dimgrey",
+		},
+		{
+			name: "olive-green",
+			color: "darkkhaki",
+			backgroundColor: "darkolivegreen",
+		},
+		{
+			name: "dark-grey",
+			color: "darkgrey",
+			backgroundColor: "#222222",
+		},
+		{
+			name: "brown",
+			color: "chocolate",
+			backgroundColor: "sienna",
+		},
+		{
+			name: "khaki",
+			color: "cornsilk",
+			backgroundColor: "darkkhaki",
+		},
+		{
+			name: "sand",
+			color: "cornsilk",
+			backgroundColor: "burlywood",
+		},
+		{
+			name: "blood-red",
+			color: "palevioletred",
+			backgroundColor: "#440000",
+		},
+		{
+			name: "sea-green",
+			color: "mediumspringgreen",
+			backgroundColor: "mediumseagreen",
+		},
 	];
 
 	var state = {}
@@ -192,6 +233,7 @@
 	let threshold = 0;
 
 	var nTeams = teams.length;
+	var origNTeams = nTeams;
 	// NTeams but with ease in to avoid instant deaths
 	var smoothNTeams = nTeams;
 
@@ -227,6 +269,7 @@
 		ctx.clearRect(0, 0, canvas.width, canvas.height);
 
 		nTeams = cols;
+		origNTeams = nTeams;
 		smoothNTeams = cols;
 
 		canvas.width = canvasW;
@@ -284,8 +327,10 @@
 
 			for (let i = 0; i < teams.length; i++) {
 				const angle = randomNum(0, 2 * Math.PI);
-				state[i].dx = 8 * Math.cos(angle);
-				state[i].dy = 8 * Math.sin(angle);
+				// this is in canvas coords so compensate squareSize
+				const initSpeed = 0.5 * squareSize;
+				state[i].dx = initSpeed * Math.cos(angle);
+				state[i].dy = initSpeed * Math.sin(angle);
 			}
 		}
 
@@ -306,6 +351,9 @@
 	switch (params.get("size")) {
 		case "big":
 			initialState({gridW: 4, gridH: 3, cols: 12, canvasW: 1600, canvasH: 1000});
+			break;
+		case "massive":
+			initialState({gridW: 5, gridH: 4, cols: 20, canvasW: 2000, canvasH: 1500, squareSize: 10});
 			break;
 		case "small":
 			initialState({gridW: 2, gridH: 1, cols: 2, canvasW: 600, canvasH: 600, squareSize: 25});
@@ -462,7 +510,8 @@
 					updatedDy += randomNum(-0.15, 0.15);
 					updatedDx *= coeff;
 					updatedDy *= coeff;
-					const speedLim = mix(30, 13, suddenDeathCoeff)
+					// speedLim is based on canvas coords but we should compensate it when squareSize changes
+					const speedLim = mix(30, 13, suddenDeathCoeff) / 16 * squareSize
 					const norm = (updatedDx**2 + updatedDy**2)**(1/2)
 					const scalar = Math.min(speedLim/norm, 1)
 					updatedDx *= scalar;
@@ -555,11 +604,14 @@
 		}
 
 		updateScoreElement();
+
 		if (suddenDeathStart !== null) {
-			suddenDeathCoeff = Math.min((elapsedSec()/60/5)**15, 1);
-		} else if (nTeams <= 3) {
-			suddenDeathStart = new Date();
+			suddenDeathCoeff = clamp(0, 1, (elapsedSec()/60/5)**15);
+		} else if (smoothNTeams <= origNTeams * 0.33) {
+			const delta = 1000 * 60 * 5 * randomNum(-0.75, 1);
+			suddenDeathStart = new Date((new Date()).getTime() + delta);
 		}
+
 		requestAnimationFrame(draw);
 	}
 
