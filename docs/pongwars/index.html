@@ -346,6 +346,11 @@
 		modeLinks[i].href = loc.href;
 	}
 
+	// a lot of things are based on canvas coords not real square coords
+	function compensateSquareSize(x) {
+		return x / 16 * squareSize;
+	}
+
 	function initialState({gridW = 4, gridH = 2, cols = teams.length, canvasW=1200, canvasH=800, squareSize=16} = {}) {
 		ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -408,8 +413,7 @@
 
 			for (let i = 0; i < teams.length; i++) {
 				const angle = randomNum(0, 2 * Math.PI);
-				// this is in canvas coords so compensate squareSize
-				const initSpeed = 0.5 * squareSize;
+				const initSpeed = compensateSquareSize(8);
 				state[i].dx = initSpeed * Math.cos(angle);
 				state[i].dy = initSpeed * Math.sin(angle);
 			}
@@ -506,7 +510,7 @@
 
 	function updateSquareAndBounce(x, y, dx, dy, color) {
 		if (state[color].elim) return
-		if (Math.max(Math.abs(dx), Math.abs(dy)) < 0.02) state[color].elim = true
+		if (Math.max(Math.abs(dx), Math.abs(dy)) < compensateSquareSize(0.02)) state[color].elim = true
 
 		if (Math.min(x, y) < 0 || isNaN(x) || isNaN(y)) {
 			console.warn(`warped ${teams[color].name}`)
@@ -590,12 +594,11 @@
 						updatedDy = -updatedDy;
 					}
 
-					updatedDx += randomNum(-0.15, mix(0.153, 0.15, suddenDeathCoeff));
-					updatedDy += randomNum(-0.15, 0.15);
+					updatedDx += compensateSquareSize(randomNum(-0.15, mix(0.153, 0.15, suddenDeathCoeff)))
+					updatedDy += compensateSquareSize(randomNum(-0.15, 0.15))
 					updatedDx *= coeff;
 					updatedDy *= coeff;
-					// speedLim is based on canvas coords but we should compensate it when squareSize changes
-					const speedLim = mix(30, 13, suddenDeathCoeff) / 16 * squareSize
+					const speedLim = compensateSquareSize(mix(30, 15, suddenDeathCoeff))
 					const norm = (updatedDx**2 + updatedDy**2)**(1/2)
 					const scalar = Math.min(speedLim/norm, 1)
 					updatedDx *= scalar;
