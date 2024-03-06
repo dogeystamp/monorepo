@@ -31,7 +31,7 @@
 				display: block;
 				border-radius: 4px;
 				overflow: hidden;
-				width: 100%;
+				max-width: 150%;
 				margin-top: auto;
 				box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
 			}
@@ -95,6 +95,7 @@
 				<a class="modeLink" data-mode="big">big</a>
 				<a class="modeLink" data-mode="small">small</a>
 				<a class="modeLink" data-mode="massive">massive</a>
+				<a class="modeLink" data-mode="battle-royale">battle-royale</a>
 			</div>
 		</div>
 	</body>
@@ -202,7 +203,7 @@
 		},
 		{
 			name: "sand",
-			color: "cornsilk",
+			color: "#BA9500",
 			backgroundColor: "burlywood",
 		},
 		{
@@ -214,6 +215,86 @@
 			name: "sea-green",
 			color: "mediumspringgreen",
 			backgroundColor: "mediumseagreen",
+		},
+		{
+			name: "peachpuff",
+			color: "white",
+			backgroundColor: "peachpuff",
+		},
+		{
+			name: "dark-brown",
+			color: "saddlebrown",
+			backgroundColor: "#3B1503",
+		},
+		{
+			name: "swamp",
+			color: "darkseagreen",
+			backgroundColor: "#2B2503",
+		},
+		{
+			name: "light-sea-green",
+			color: "mediumspringgreen",
+			backgroundColor: "darkseagreen",
+		},
+		{
+			name: "wood",
+			color: "cornsilk",
+			backgroundColor: "#BE9867",
+		},
+		{
+			name: "lavender",
+			color: "honeydew",
+			backgroundColor: "thistle",
+		},
+		{
+			name: "pale-violet",
+			color: "coral",
+			backgroundColor: "palevioletred",
+		},
+		{
+			name: "violet",
+			color: "violet",
+			backgroundColor: "blueviolet",
+		},
+		{
+			name: "epaper-white",
+			color: "black",
+			backgroundColor: "lemonchiffon",
+		},
+		{
+			name: "lcd-green",
+			color: "#A8C64E",
+			backgroundColor: "#4C412C",
+		},
+		{
+			name: "orange-blue",
+			color: "tomato",
+			backgroundColor: "darkslateblue",
+		},
+		{
+			name: "cyan",
+			color: "cornsilk",
+			backgroundColor: "#00AAAA",
+		},
+		{
+			name: "neon-green",
+			color: "olivedrab",
+			backgroundColor: "greenyellow",
+		},
+		{
+			name: "r",
+			color: "white",
+			backgroundColor: "#DD0000",
+		},
+		{
+			name: "g",
+			color: "white",
+			backgroundColor: "#00DD00",
+		},
+		{
+			name: "b",
+			color: "white",
+			backgroundColor: "#0000DD",
 		},
 	];
 
@@ -354,6 +435,9 @@
 			break;
 		case "massive":
 			initialState({gridW: 5, gridH: 4, cols: 20, canvasW: 2000, canvasH: 1500, squareSize: 10});
+			break;
+		case "battle-royale":
+			initialState({gridW: 9, gridH: 4, cols: 36, canvasW: 2000, canvasH: 1000, squareSize: 5});
 			break;
 		case "small":
 			initialState({gridW: 2, gridH: 1, cols: 2, canvasW: 600, canvasH: 600, squareSize: 25});
