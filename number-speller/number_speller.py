@@ -113,6 +113,10 @@ def fmt_hundreds(x: int) -> list[str]:
 
 def fmt_num(x: int) -> list[str]:
     ans: list[str] = []
+
+    if x == 0:
+        return ["zero"]
+
     p: int = math.ceil(math.log10(x) // 3) * 3
     while p >= 3:
         val = x // (10**p)
@@ -125,5 +129,6 @@ def fmt_num(x: int) -> list[str]:
     return ans
 
 
-i = int(input())
-print(" ".join(fmt_num(i)))
+if __name__ == "__main__":
+    i = int(input())
+    print(" ".join(fmt_num(i)))
