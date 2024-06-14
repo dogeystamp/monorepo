@@ -2,4 +2,9 @@
 
 Generate flashcards for a range of frequent hanzi characters.
 
-You need the [hanziDB CSV](https://github.com/ruddfawcett/hanziDB.csv) file for this to work.
+There are multiple sources for words:
+
+- [hanziDB CSV](https://github.com/ruddfawcett/hanziDB.csv) (purely frequency based)
+- [hsk CSV](https://github.com/plaktos/hsk_csv) (common usage words, graded by difficulty)
+
+Be careful to keep the filenames as `hanzi_db.csv` and `hsk*.csv` because the script tries to recognize these.
