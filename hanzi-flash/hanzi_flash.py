@@ -31,11 +31,14 @@ prev: set[str] = set()
 single: set[str] = set()
 """Already single characters."""
 
-uniq: dict[str, set[str]] = {}
-"""Character to words mapping."""
+uniq: dict[str, set[tuple[int, str]]] = {}
+"""Character to index + word tuples mapping."""
 
 prons: dict[str, set[str]] = {}
 """Character to pronunciations mapping."""
+
+to_study: set[str] = set()
+"""Characters to generate flashcards for."""
 
 with open(args.input) as csv_file:
     reader = csv.reader(csv_file)
@@ -48,27 +51,28 @@ with open(args.input) as csv_file:
     for i, row in enumerate(iterator):
         word, pron, mean = row[:3]
         if args.single:
-            if i >= args.end:
-                if len(word) == 1:
-                    single.add(word[0])
-            elif len(word) > 1:
+            if len(word) > 1:
                 for sound, char in zip(pron.lower().split(), word):
+                    if char not in uniq:
+                        uniq[char] = set()
+                        prons[char] = set()
+                    uniq[char].add((i, word))
+                    prons[char].add(sound)
                     if i < args.start - 1:
                         prev.add(char)
-                    elif char not in prev:
-                        if char not in uniq:
-                            uniq[char] = set()
-                            prons[char] = set()
-                        uniq[char].add(word)
-                        prons[char].add(sound)
+                    elif i < args.end and char not in prev:
+                        to_study.add(char)
             else:
                 single.add(word[0])
         else:
             writer.writerow([word, f"{pron} ({mean})"])
 
     if args.single:
-        for char in uniq:
+        for char in to_study:
             if char not in single:
                 writer.writerow(
-                    [char, f"{', '.join(prons[char])} / {' '.join(uniq[char])}"]
+                    [
+                        char,
+                        f"{', '.join(prons[char])} / {' '.join(c for _, c in sorted(uniq[char]))}",
+                    ]
                 )
