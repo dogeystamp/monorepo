@@ -11,9 +11,11 @@ import argparse
 import sys
 from pathlib import Path
 
+inf = 99999999
+
 parser = argparse.ArgumentParser()
 parser.add_argument("-s", "--start", default=1, type=int)
-parser.add_argument("-e", "--end", default=99999999, type=int)
+parser.add_argument("-e", "--end", default=inf, type=int)
 parser.add_argument("-i", "--input", default="all_hsk.csv", type=Path)
 parser.add_argument(
     "-S",
@@ -38,11 +40,18 @@ prons: dict[str, set[str]] = {}
 with open(args.input) as csv_file:
     reader = csv.reader(csv_file)
     writer = csv.writer(sys.stdout)
-    start = 0 if args.single else args.start - 1
-    for i, row in enumerate(itertools.islice(reader, start, args.end)):
+
+    iterator = (
+        reader if args.single else itertools.islice(reader, args.start - 1, args.end)
+    )
+
+    for i, row in enumerate(iterator):
         word, pron, mean = row[:3]
         if args.single:
-            if len(word) > 1:
+            if i >= args.end:
+                if len(word) == 1:
+                    single.add(word[0])
+            elif len(word) > 1:
                 for sound, char in zip(pron.lower().split(), word):
                     if i < args.start - 1:
                         prev.add(char)
