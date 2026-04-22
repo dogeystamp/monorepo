@@ -159,7 +159,7 @@ html, body {
     </head>
     <body>
         <audio id="bgMusic" loop>
-            <source src="https://raw.githubusercontent.com/JoelBeilis/pp/refs/heads/main/maye - Yours (Official Audio).mp3" type="audio/mpeg" />
+            <source src="https://raw.githubusercontent.com/JoelBeilis/pp/refs/heads/main/maye - Yours (Official Audio).mp3" autoplay type="audio/mpeg" />
         </audio>
 
         <main>
@@ -172,6 +172,13 @@ html, body {
             <div id="proposal" class="msg">
                 <h1 id="msg-title" class="display msg">mimimimi</h2>
                 <p id="msg-content" class="display msg">mimimimi</p>
+            </div>
+
+            <div class="button-group edit">
+                <label for="start-time">Start time</label>
+                <input type="datetime-local" id="start-time"/>
+                <label for="end-time">End time</label>
+                <input type="datetime-local" id="end-time"/>
             </div>
 
             <div class="button-group">
@@ -198,12 +205,16 @@ html, body {
 
             let txt_title = "";
             let txt_content = "";
+            let dt_start = new Date();
+            let dt_end = new Date();
 
             if (window.location.hash) {
                 const dec = new TextDecoder();
                 let data = JSON.parse(dec.decode(Uint8Array.fromBase64(window.location.hash.slice(1))));
                 txt_title = data.title;
                 txt_content = data.content;
+                dt_start = new Date(data.start);
+                dt_end = new Date(data.end);
 
                 document.querySelectorAll(".edit").forEach((elem) => elem.style.display = "none");
             } else {
@@ -297,6 +308,8 @@ html, body {
         function updateText() {
             txt_title = questionBox.value;
             txt_content = detailsBox.value;
+            dt_start = new Date(document.querySelector("#start-time").value);
+            dt_end = new Date(document.querySelector("#end-time").value);
         }
 
         function copyText() {
@@ -304,6 +317,8 @@ html, body {
             const obj = JSON.stringify({
                 "title": txt_title,
                 "content": txt_content,
+                "start": dt_start,
+                "end": dt_end,
             });
             const enc = new TextEncoder();
             const data = enc.encode(obj).toBase64();
@@ -315,8 +330,8 @@ html, body {
         function downloadICS() {
             const title = questionBox.value;
             const description = detailsBox.value;
-            const startDate = new Date();
-            const endDate = new Date(startDate.getTime() + 2 * 60 * 60 * 1000);
+            const startDate = dt_start;
+            const endDate = dt_end;
 
             const pad = n => String(n).padStart(2, '0');
             const formatDate = d => `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}00Z`;
