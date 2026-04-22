@@ -251,6 +251,9 @@ html, body {
             let music = document.getElementById("bgMusic");
             music.volume = 0.1;
             music.play().catch(() => {});
+            document.addEventListener('click', () => {
+                music.play().catch(() => {});
+            }, { once: true });
 
             function createHeart() {
                 const heart = document.createElement('div');
