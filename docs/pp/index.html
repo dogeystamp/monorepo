@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+        <title>Proposal</title>
+        <style>
+html, body {
+    height: 100%;
+    margin: 0;
+    font-family: 'Comic Sans MS', cursive, sans-serif;
+    background: url('https://raw.githubusercontent.com/JoelBeilis/pp/refs/heads/main/ppbackground.jpg') no-repeat center center fixed;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    color: #fff;
+    text-align: center;
+    padding: 50px 20px;
+    overflow-x: hidden;
+}
+
+    h1 {
+        font-size: 2em;
+        margin-bottom: 20px;
+    }
+
+    textarea {
+        width: 90%;
+        max-width: 600px;
+        height: 100px;
+        font-size: 1.1em;
+        padding: 12px;
+        border-radius: 12px;
+        border: none;
+        resize: vertical;
+        margin: 15px auto;
+        display: block;
+    }
+
+    .button-group {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 20px;
+        margin: 20px 0;
+    }
+
+    button, a.share-link {
+        padding: 10px 20px;
+        font-size: 1rem;
+        border: none;
+        border-radius: 999px;
+        cursor: pointer;
+        text-decoration: none;
+        background-color: #ffb6c1;
+        color: black;
+        transition: background 0.3s ease, transform 0.2s ease;
+        min-width: 180px;
+        max-width: 240px;
+        width: 80%;
+        box-shadow: 2px 4px 10px rgba(0, 0, 0, 0.2);
+        text-align: center;
+        display: inline-block;
+    }
+
+    button:hover, a.share-link:hover {
+        background-color: #ff99aa;
+    }
+
+    #noBtn {
+        background-color: #db7093;
+    }
+
+    #response {
+        font-size: 1.3em;
+        color: #fff5f5;
+        min-height: 1.5em;
+        padding-top: 1%;
+    }
+
+    .heart, .sparkle, .confetti {
+        position: absolute;
+    }
+
+    .heart {
+        width: 20px;
+        height: 20px;
+        background-color: pink;
+        transform: rotate(45deg);
+        animation: floatUp 4s linear infinite;
+    }
+
+    .heart::before, .heart::after {
+        content: "";
+        width: 20px;
+        height: 20px;
+        position: absolute;
+        background-color: pink;
+        border-radius: 50%;
+    }
+
+    .heart::before { top: -10px; left: 0; }
+    .heart::after { left: -10px; top: 0; }
+
+    .sparkle {
+        width: 5px;
+        height: 5px;
+        background: white;
+        border-radius: 50%;
+        opacity: 0.8;
+        animation: sparkleFade 1s ease-out forwards;
+    }
+
+    .confetti {
+        width: 8px;
+        height: 12px;
+        background-color: hsl(var(--hue), 70%, 60%);
+        animation: fall 3s linear forwards;
+        opacity: 0.9;
+    }
+
+    #proposal {
+        background: white;
+        color: black;
+        padding: 1em;
+        border-radius: 1em;
+    }
+
+    @keyframes floatUp {
+        0% { transform: translateY(0) scale(1) rotate(45deg); opacity: 1; }
+        100% { transform: translateY(-800px) scale(1.5) rotate(45deg); opacity: 0; }
+    }
+
+    @keyframes sparkleFade {
+        0% { transform: scale(1); opacity: 1; }
+        100% { transform: scale(2); opacity: 0; }
+    }
+
+    @keyframes fall {
+        0% { transform: translateY(0) rotate(0deg); }
+        100% { transform: translateY(100vh) rotate(720deg); }
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+
+    select {
+        font-size: 1rem;
+        padding: 6px 12px;
+        border-radius: 8px;
+        border: none;
+        margin-top: 10px;
+    }
+        </style>
+    </head>
+    <body>
+        <audio id="bgMusic" loop>
+            <source src="https://raw.githubusercontent.com/JoelBeilis/pp/refs/heads/main/maye - Yours (Official Audio).mp3" type="audio/mpeg" />
+        </audio>
+
+        <main>
+            <h1 class="edit">Your Proposal Message</h1>
+            <textarea class="edit" id="questionBox">Will you go to prom with me?</textarea>
+
+            <h1 class="edit">Add Event Details</h1>
+            <textarea class="edit" id="detailsBox">Friday night at the Botanical Garden 🌸 7 PM – bring your dancing shoes!</textarea>
+
+            <div id="proposal" class="msg">
+                <h1 id="msg-title" class="display msg">mimimimi</h2>
+                <p id="msg-content" class="display msg">mimimimi</p>
+            </div>
+
+            <div class="button-group">
+                <button onclick="copyText()" id="copy-message" class="edit">Copy Link</button>
+                <button class="msg" onclick="downloadICS()">Add to Calendar</button>
+            </div>
+
+            <div class="button-group msg">
+                <button id="yesBtn">Yes</button>
+                <button id="noBtn">No</button>
+            </div>
+
+            <div id="response"></div>
+        </main>
+
+        <script>
+            const yesBtn = document.getElementById("yesBtn");
+            const noBtn = document.getElementById("noBtn");
+            const questionBox = document.getElementById("questionBox");
+            const detailsBox = document.getElementById("detailsBox");
+            const questionMsg = document.getElementById("msg-title");
+            const detailsMsg = document.getElementById("msg-content");
+            const responseDiv = document.getElementById("response");
+
+            let txt_title = "";
+            let txt_content = "";
+
+            if (window.location.hash) {
+                const dec = new TextDecoder();
+                let data = JSON.parse(dec.decode(Uint8Array.fromBase64(window.location.hash.slice(1))));
+                txt_title = data.title;
+                txt_content = data.content;
+
+                document.querySelectorAll(".edit").forEach((elem) => elem.style.display = "none");
+            } else {
+                document.querySelectorAll(".msg").forEach((elem) => elem.style.display = "none");
+            }
+
+            questionBox.value = txt_title;
+            detailsBox.value = txt_content;
+            questionMsg.innerText = txt_title;
+            detailsMsg.innerText = txt_content;
+
+            let noClickCount = 0;
+            let yesBtnScale = 1;
+
+            const noMessages = [
+                "what?",
+                "why?",
+                "click the other button...",
+                "guh...",
+                "why are you clicking no :(",
+                "*LOUD INCORRECT BUZZER*",
+                "red stop sign emoji",
+                "stoppe 🐸",
+                "nur ur",
+                "please 🥺",
+                "arrête",
+                "nuh uh",
+                "please 🥺🥺🥺",
+                "naur",
+                "man standing emoji",
+                ":(",
+            ]
+
+            let music = document.getElementById("bgMusic");
+            music.volume = 0.1;
+            music.play().catch(() => {});
+
+            function createHeart() {
+                const heart = document.createElement('div');
+                heart.classList.add('heart');
+                heart.style.left = Math.random() * 100 + 'vw';
+                heart.style.top = '100%';
+                heart.style.animationDuration = Math.random() * 3 + 2 + 's';
+                document.body.appendChild(heart);
+                setTimeout(() => heart.remove(), 5000);
+            }
+            setInterval(createHeart, 300);
+
+            function createSparkles(x, y) {
+                for (let i = 0; i < 20; i++) {
+                    const sparkle = document.createElement('div');
+                    sparkle.classList.add('sparkle');
+                    sparkle.style.left = `${x + (Math.random() - 0.5) * 50}px`;
+                    sparkle.style.top = `${y + (Math.random() - 0.5) * 50}px`;
+                    document.body.appendChild(sparkle);
+                    setTimeout(() => sparkle.remove(), 1000);
+                }
+            }
+
+            function launchConfetti() {
+                for (let i = 0; i < 100; i++) {
+                    const confetti = document.createElement('div');
+                    confetti.classList.add('confetti');
+                    confetti.style.left = Math.random() * 100 + 'vw';
+                    confetti.style.top = Math.random() * 100 + 'vw';
+                    confetti.style.setProperty('--hue', Math.floor(Math.random() * 360));
+                    document.body.appendChild(confetti);
+                    setTimeout(() => confetti.remove(), 3000);
+                }
+            }
+
+            yesBtn.addEventListener("click", (e) => {
+                createSparkles(e.clientX, e.clientY);
+                launchConfetti();
+                const main = document.querySelector("main");
+                setTimeout(() => {
+                    main.innerHTML = `
+          <h1 style="animation: fadeIn 2s ease-in-out;">yayyyyyyyyyyyy :\></h1>
+          <h2 style="animation: fadeIn 2s ease-in-out; font-weight: normal;">i approve nod nod nod</h2>
+        `;
+                }, 500);
+            });
+
+            noBtn.addEventListener("click", () => {
+                noClickCount++;
+                yesBtnScale *= 1.1;
+                yesBtn.style.transform = `scale(${yesBtnScale})`;
+                responseDiv.textContent = noMessages[Math.min(noClickCount - 1, noMessages.length - 1)];
+            });
+
+        function updateText() {
+            txt_title = questionBox.value;
+            txt_content = detailsBox.value;
+        }
+
+        function copyText() {
+            updateText();
+            const obj = JSON.stringify({
+                "title": txt_title,
+                "content": txt_content,
+            });
+            const enc = new TextEncoder();
+            const data = enc.encode(obj).toBase64();
+            const url = new URL(window.location.href);
+            url.hash = data;
+            navigator.clipboard.writeText(url.href).then(() => alert("Copied."));
+        }
+
+        function downloadICS() {
+            const title = questionBox.value;
+            const description = detailsBox.value;
+            const startDate = new Date();
+            const endDate = new Date(startDate.getTime() + 2 * 60 * 60 * 1000);
+
+            const pad = n => String(n).padStart(2, '0');
+            const formatDate = d => `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}00Z`;
+
+            function icsify(txt) {
+                return txt.replaceAll("\n", "\\n");
+            }
+
+            const icsContent = `BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+SUMMARY:${icsify(txt_title)}
+DESCRIPTION:${icsify(txt_content)}
+DTSTART:${formatDate(startDate)}
+DTEND:${formatDate(endDate)}
+END:VEVENT
+END:VCALENDAR`;
+
+            const blob = new Blob([icsContent], { type: 'text/calendar' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'prom-event.ics';
+            link.click();
+        }
+        </script>
+    </body>
+</html>
