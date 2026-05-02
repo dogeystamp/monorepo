@@ -5,12 +5,25 @@
 # dependencies = [
 #     "aioping>=0.4.0",
 #     "plumbum",
+#     "requests>=2.33.1",
 #     "rich>=15.0.0",
 # ]
 #
 # [tool.uv.sources]
 # plumbum = { git = "https://github.com/tomerfiliba/plumbum", rev = "32fa01302a6c9302e7f2e61a560da9faea6c62ff" }
 # ///
+
+"""
+Ping dashboard script.
+
+
+Writing new pings
+-----------------
+
+To write a new ping implementation:
+- Subclass [`PingImplementation`].
+- Add a case in [`parse_host`] to instantiate your implementation.
+"""
 
 from typing import assert_never, Callable
 from dataclasses import dataclass
@@ -21,8 +34,10 @@ from rich.live import Live
 import rich.box
 import rich.markup
 import asyncio
+import requests
 from abc import ABC, abstractmethod
 from plumbum import async_local, ProcessExecutionError, cli
+from urllib.parse import urlparse
 
 ping = async_local["ping"]
 notify_send = async_local["notify-send"]
@@ -70,17 +85,25 @@ class HostStateDownICMP(HostStateDown):
 
 
 @dataclass
+class HostStateDownHTTP(HostStateDown):
+    err: Exception
+
+
+@dataclass
 class Host:
     """Information about a healthcheck target."""
 
-    hostname: str
+    id: str
     """Unique ID for this target (not necessarily a network hostname)."""
+
+    name: str
+    """Human readable name."""
 
     pinger: "PingImplementation"
     """Object that can be used to ping this host."""
 
     def __hash__(self):
-        return self.hostname.__hash__()
+        return self.id.__hash__()
 
 
 @dataclass
@@ -133,7 +156,7 @@ def state_to_badge(state: HostState) -> str:
     """Convert state to badge in Rich console markup."""
 
     def wrap(s: str):
-        # no-op for now, but can be used to turn OK into [OK]
+        # no-op for now, but can be used to turn `OK` into `[OK]`
         return s
 
     match state:
@@ -145,6 +168,30 @@ def state_to_badge(state: HostState) -> str:
             return wrap(f"[bold {PENDING_COLOR}]--[/]")
         case _:
             assert_never(state)
+
+
+def parse_host(host: str) -> Host:
+    """
+    Parse a host string into a [Host] object.
+
+    Use a hash symbol to set a friendly name for the host.
+    """
+    parts = urlparse(host)
+    name = parts.fragment or host
+
+    pinger: PingImplementation | None = None
+
+    if parts.scheme in ("http", "https"):
+        # http healthcheck
+        pinger = PingHTTP(url=host)
+    elif parts.scheme == "":
+        # ICMP ping
+        pinger = PingICMP(endpoint=parts.path)
+    else:
+        raise ValueError(f"Couldn't parse host: '{host}'")
+
+    assert pinger is not None
+    return Host(name=name, id=host, pinger=pinger)
 
 
 # ------------------------
@@ -167,12 +214,28 @@ class PingICMP(PingImplementation):
     endpoint: str
     """Network host to ping (e.g. an IP address)."""
 
-    async def ping(self):
+    async def ping(self) -> HostState:
         try:
             await ping("-c", "1", "--", self.endpoint)
             return HostStateUp()
         except ProcessExecutionError as err:
             return HostStateDownICMP(err=err)
+
+
+@dataclass
+class PingHTTP(PingImplementation):
+    """HTTP GET healthcheck."""
+
+    url: str
+    """URL to check."""
+
+    async def ping(self) -> HostState:
+        try:
+            r = requests.get(self.url)
+            r.raise_for_status()
+        except requests.exceptions.RequestException as err:
+            return HostStateDownHTTP(err=err)
+        return HostStateUp()
 
 
 async def ping_task(state: PingerState) -> None:
@@ -211,7 +274,7 @@ async def display_task(state: PingerState):
             tab.add_column(justify="left")
             tab.add_column(justify="right")
             tab.add_row(
-                f"[bold]{state.name_filter_rich(host.hostname)}[/]",
+                f"[bold]{state.name_filter_rich(host.name)}[/]",
                 state_to_badge(hstate),
             )
             panels.append(Panel(tab, box=rich.box.SQUARE))
@@ -228,7 +291,7 @@ async def display_task(state: PingerState):
                         new_state, HostStateDown
                     ):
                         await notify(
-                            f"{state.name_filter(host.hostname)} is now {state_to_name(new_state)}"
+                            f"{state.name_filter(host.name)} is now {state_to_name(new_state)}"
                         )
             live.update(render_dashboard())
 
@@ -240,7 +303,9 @@ async def display_task(state: PingerState):
 
 class Pinger(cli.Application):
     upper = cli.Flag(
-        ["-U", "--upper"], help="Display all names uppercase. Improves coolness of dashboard.", default=False
+        ["-U", "--upper"],
+        help="Display all names uppercase. Improves coolness of dashboard.",
+        default=False,
     )
 
     def main(self, *hosts: str):
@@ -257,7 +322,7 @@ class Pinger(cli.Application):
                 name_filter_rich = lambda s: rich.markup.escape(str.upper(s))  # noqa: E731
 
             state = PingerState(
-                hosts=[Host(host, PingICMP(host)) for host in hosts],
+                hosts=[parse_host(host) for host in hosts],
                 queue=asyncio.Queue(),
                 finished=asyncio.Event(),
                 name_filter=name_filter,
