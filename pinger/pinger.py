@@ -12,12 +12,14 @@
 # plumbum = { git = "https://github.com/tomerfiliba/plumbum", rev = "32fa01302a6c9302e7f2e61a560da9faea6c62ff" }
 # ///
 
-from typing import assert_never
+from typing import assert_never, Callable
 from dataclasses import dataclass
 from rich.panel import Panel
 from rich.table import Table
 from rich.columns import Columns
 from rich.live import Live
+import rich.box
+import rich.markup
 import asyncio
 from abc import ABC, abstractmethod
 from plumbum import async_local, ProcessExecutionError, cli
@@ -29,8 +31,8 @@ notify_send = async_local["notify-send"]
 # CONSTANTS
 # ---------------
 
-WAIT_TIME = 1
-"""Time spent waiting between healthchecks."""
+WAIT_TIME = 10
+"""Seconds to wait between healthchecks."""
 
 
 UP_COLOR = "#44cc44"
@@ -98,6 +100,12 @@ class PingerState:
     queue: asyncio.Queue[PingerEvent]
     finished: asyncio.Event
 
+    name_filter_rich: Callable[[str], str]
+    """Function that filters host names into Rich markup."""
+
+    name_filter: Callable[[str], str]
+    """Function that filters host names into text."""
+
 
 # ---------------------
 # UTILITIES
@@ -125,7 +133,8 @@ def state_to_badge(state: HostState) -> str:
     """Convert state to badge in Rich console markup."""
 
     def wrap(s: str):
-        return f"\\[{s}]"
+        # no-op for now, but can be used to turn OK into [OK]
+        return s
 
     match state:
         case HostStateUp():
@@ -191,22 +200,24 @@ async def ping_task(state: PingerState) -> None:
 # -----------------
 
 
-def render_dashboard(states: dict[Host, HostState]):
-    """Render dashboard."""
-    panels = []
-    for host, state in states.items():
-        tab = Table.grid(expand=True, padding=1)
-        tab.add_column(justify="left")
-        tab.add_column(justify="right")
-        tab.add_row(f"[bold]{host.hostname}[/]", state_to_badge(state))
-        panels.append(Panel(tab))
-    return Columns(panels)
-
-
 async def display_task(state: PingerState):
     states: dict[Host, HostState] = {host: HostStatePending() for host in state.hosts}
 
-    with Live(render_dashboard(states), refresh_per_second=4, screen=True) as live:
+    def render_dashboard():
+        """Render dashboard."""
+        panels = []
+        for host, hstate in states.items():
+            tab = Table.grid(expand=True, padding=2)
+            tab.add_column(justify="left")
+            tab.add_column(justify="right")
+            tab.add_row(
+                f"[bold]{state.name_filter_rich(host.hostname)}[/]",
+                state_to_badge(hstate),
+            )
+            panels.append(Panel(tab, box=rich.box.SQUARE))
+        return Columns(panels)
+
+    with Live(render_dashboard(), refresh_per_second=4, screen=True) as live:
         while not state.finished.is_set():
             event = await state.queue.get()
             match event:
@@ -217,9 +228,9 @@ async def display_task(state: PingerState):
                         new_state, HostStateDown
                     ):
                         await notify(
-                            f"{host.hostname} is now {state_to_name(new_state)}"
+                            f"{state.name_filter(host.hostname)} is now {state_to_name(new_state)}"
                         )
-            live.update(render_dashboard(states))
+            live.update(render_dashboard())
 
 
 # ------------------------
@@ -228,15 +239,29 @@ async def display_task(state: PingerState):
 
 
 class Pinger(cli.Application):
+    upper = cli.Flag(
+        ["-U", "--upper"], help="Display all names uppercase. Improves coolness of dashboard.", default=False
+    )
+
     def main(self, *hosts: str):
         async def amain():
             if len(hosts) == 0:
                 Pinger.help(self)
                 return 1
+
+            name_filter = lambda s: s  # noqa: E731
+            name_filter_rich = rich.markup.escape
+
+            if self.upper:
+                name_filter = str.upper
+                name_filter_rich = lambda s: rich.markup.escape(str.upper(s))  # noqa: E731
+
             state = PingerState(
-                [Host(host, PingICMP(host)) for host in hosts],
-                asyncio.Queue(),
-                asyncio.Event(),
+                hosts=[Host(host, PingICMP(host)) for host in hosts],
+                queue=asyncio.Queue(),
+                finished=asyncio.Event(),
+                name_filter=name_filter,
+                name_filter_rich=name_filter_rich,
             )
 
             async with asyncio.TaskGroup() as tg:
