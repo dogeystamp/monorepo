@@ -19,11 +19,28 @@ from rich.table import Table
 from rich.columns import Columns
 from rich.live import Live
 import asyncio
+from abc import ABC, abstractmethod
 from plumbum import async_local, ProcessExecutionError, cli
-from sys import stderr
 
 ping = async_local["ping"]
 notify_send = async_local["notify-send"]
+
+# ---------------
+# CONSTANTS
+# ---------------
+
+WAIT_TIME = 1
+"""Time spent waiting between healthchecks."""
+
+
+UP_COLOR = "#44cc44"
+"""Color for online hosts."""
+
+DOWN_COLOR = "#cc4444"
+"""Color for offline hosts."""
+
+PENDING_COLOR = "gray"
+"""Color for hosts of unknown status."""
 
 # ---------------
 # TYPES
@@ -52,7 +69,13 @@ class HostStateDownICMP(HostStateDown):
 
 @dataclass
 class Host:
+    """Information about a healthcheck target."""
+
     hostname: str
+    """Unique ID for this target (not necessarily a network hostname)."""
+
+    pinger: "PingImplementation"
+    """Object that can be used to ping this host."""
 
     def __hash__(self):
         return self.hostname.__hash__()
@@ -98,11 +121,6 @@ def state_to_name(state: HostState) -> str:
             assert_never(state)
 
 
-UP_COLOR = "#44cc44"
-DOWN_COLOR = "#cc4444"
-PENDING_COLOR = "gray"
-
-
 def state_to_badge(state: HostState) -> str:
     """Convert state to badge in Rich console markup."""
 
@@ -124,36 +142,53 @@ def state_to_badge(state: HostState) -> str:
 # PING IMPLEMENTATIONS
 # ------------------------
 
-WAIT_TIME = 1
+
+class PingImplementation(ABC):
+    """Pinger, each instance pings one host."""
+
+    @abstractmethod
+    async def ping(self) -> HostState:
+        """Ping a host once."""
 
 
-async def ping_host_icmp(host: Host, state: PingerState):
-    """Get a single host's ping status."""
-    current_state: HostState = HostStatePending()
-    while not state.finished.is_set():
-        new_state: HostState
+@dataclass
+class PingICMP(PingImplementation):
+    """ICMP net ping using Unix `ping`."""
+
+    endpoint: str
+    """Network host to ping (e.g. an IP address)."""
+
+    async def ping(self):
         try:
-            await ping("-c", "1", "--", host.hostname)
-            new_state = HostStateUp()
+            await ping("-c", "1", "--", self.endpoint)
+            return HostStateUp()
         except ProcessExecutionError as err:
-            new_state = HostStateDownICMP(err=err)
-        if not isinstance(new_state, type(current_state)):
-            current_state = new_state
-            await state.queue.put(EventChange(host=host, new_state=new_state))
-        await asyncio.sleep(WAIT_TIME)
+            return HostStateDownICMP(err=err)
 
 
 async def ping_task(state: PingerState) -> None:
     """Setup long-running ping tasks."""
+
+    async def ping_host(host: Host):
+        """Get a single host's ping status."""
+        current_state: HostState = HostStatePending()
+        while not state.finished.is_set():
+            new_state = await host.pinger.ping()
+            if not isinstance(new_state, type(current_state)):
+                current_state = new_state
+                await state.queue.put(EventChange(host=host, new_state=new_state))
+            await asyncio.sleep(WAIT_TIME)
+
     tasks = dict()
+
     async with asyncio.TaskGroup() as tg:
         for host in state.hosts:
-            tasks[host] = tg.create_task(ping_host_icmp(host, state))
+            tasks[host] = tg.create_task(ping_host(host))
 
 
-# ------------------------
-# MAIN ENTRY
-# ------------------------
+# -----------------
+# RENDERING TUI
+# -----------------
 
 
 def render_dashboard(states: dict[Host, HostState]):
@@ -187,14 +222,21 @@ async def display_task(state: PingerState):
             live.update(render_dashboard(states))
 
 
+# ------------------------
+# MAIN ENTRY
+# ------------------------
+
+
 class Pinger(cli.Application):
-    def main(self, *hosts):
+    def main(self, *hosts: str):
         async def amain():
             if len(hosts) == 0:
                 Pinger.help(self)
                 return 1
             state = PingerState(
-                [Host(host) for host in hosts], asyncio.Queue(), asyncio.Event()
+                [Host(host, PingICMP(host)) for host in hosts],
+                asyncio.Queue(),
+                asyncio.Event(),
             )
 
             async with asyncio.TaskGroup() as tg:
