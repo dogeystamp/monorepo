@@ -3,9 +3,9 @@
 # /// script
 # requires-python = ">=3.14"
 # dependencies = [
+#     "aiohttp>=3.13.5",
 #     "aioping>=0.4.0",
 #     "plumbum",
-#     "requests>=2.33.1",
 #     "rich>=15.0.0",
 # ]
 #
@@ -34,7 +34,8 @@ from rich.live import Live
 import rich.box
 import rich.markup
 import asyncio
-import requests
+import aiohttp
+import aiohttp.client_exceptions
 from abc import ABC, abstractmethod
 from plumbum import async_local, ProcessExecutionError, cli
 from urllib.parse import urlparse
@@ -53,6 +54,9 @@ WAIT_TIME = 10
 UP_COLOR = "#44cc44"
 """Color for online hosts."""
 
+DEGRADED_COLOR = "#cccc44"
+"""Color for degraded hosts."""
+
 DOWN_COLOR = "#cc4444"
 """Color for offline hosts."""
 
@@ -68,6 +72,10 @@ class HostStateUp:
     """Host is confirmed up."""
 
 
+class HostStateDegraded:
+    """Host is partially down."""
+
+
 class HostStateDown:
     """Host is confirmed down."""
 
@@ -76,7 +84,7 @@ class HostStatePending:
     """No data yet, and waiting on host response."""
 
 
-type HostState = HostStateUp | HostStateDown | HostStatePending
+type HostState = HostStateUp | HostStateDegraded | HostStateDown | HostStatePending
 
 
 @dataclass
@@ -122,6 +130,7 @@ class PingerState:
     hosts: list[Host]
     queue: asyncio.Queue[PingerEvent]
     finished: asyncio.Event
+    http_session: aiohttp.ClientSession
 
     name_filter_rich: Callable[[str], str]
     """Function that filters host names into Rich markup."""
@@ -143,11 +152,13 @@ def state_to_name(state: HostState) -> str:
     """Convert state to readable name."""
     match state:
         case HostStateUp():
-            return "UP"
+            return "ONLINE"
         case HostStateDown():
-            return "DOWN"
+            return "OFFLINE"
         case HostStatePending():
-            return "...."
+            return "PENDING"
+        case HostStateDegraded():
+            return "DEGRADED"
         case _:
             assert_never(state)
 
@@ -166,6 +177,8 @@ def state_to_badge(state: HostState) -> str:
             return wrap(f"[bold {DOWN_COLOR}]!![/]")
         case HostStatePending():
             return wrap(f"[bold {PENDING_COLOR}]--[/]")
+        case HostStateDegraded():
+            return wrap(f"[bold {DEGRADED_COLOR}]!~[/]")
         case _:
             assert_never(state)
 
@@ -203,7 +216,7 @@ class PingImplementation(ABC):
     """Pinger, each instance pings one host."""
 
     @abstractmethod
-    async def ping(self) -> HostState:
+    async def ping(self, _state: PingerState) -> HostState:
         """Ping a host once."""
 
 
@@ -214,7 +227,7 @@ class PingICMP(PingImplementation):
     endpoint: str
     """Network host to ping (e.g. an IP address)."""
 
-    async def ping(self) -> HostState:
+    async def ping(self, _state) -> HostState:
         try:
             await ping("-c", "1", "--", self.endpoint)
             return HostStateUp()
@@ -229,11 +242,13 @@ class PingHTTP(PingImplementation):
     url: str
     """URL to check."""
 
-    async def ping(self) -> HostState:
+    async def ping(self, _state: PingerState) -> HostState:
+        session = _state.http_session
         try:
-            r = requests.get(self.url)
-            r.raise_for_status()
-        except requests.exceptions.RequestException as err:
+            async with session.get(self.url) as resp:
+                resp.raise_for_status()
+
+        except aiohttp.client_exceptions.ClientError as err:
             return HostStateDownHTTP(err=err)
         return HostStateUp()
 
@@ -245,7 +260,7 @@ async def ping_task(state: PingerState) -> None:
         """Get a single host's ping status."""
         current_state: HostState = HostStatePending()
         while not state.finished.is_set():
-            new_state = await host.pinger.ping()
+            new_state = await host.pinger.ping(state)
             if not isinstance(new_state, type(current_state)):
                 current_state = new_state
                 await state.queue.put(EventChange(host=host, new_state=new_state))
@@ -321,17 +336,19 @@ class Pinger(cli.Application):
                 name_filter = str.upper
                 name_filter_rich = lambda s: rich.markup.escape(str.upper(s))  # noqa: E731
 
-            state = PingerState(
-                hosts=[parse_host(host) for host in hosts],
-                queue=asyncio.Queue(),
-                finished=asyncio.Event(),
-                name_filter=name_filter,
-                name_filter_rich=name_filter_rich,
-            )
+            async with aiohttp.ClientSession() as http_session:
+                state = PingerState(
+                    hosts=[parse_host(host) for host in hosts],
+                    queue=asyncio.Queue(),
+                    finished=asyncio.Event(),
+                    http_session=http_session,
+                    name_filter=name_filter,
+                    name_filter_rich=name_filter_rich,
+                )
 
-            async with asyncio.TaskGroup() as tg:
-                tg.create_task(display_task(state))
-                tg.create_task(ping_task(state))
+                async with asyncio.TaskGroup() as tg:
+                    tg.create_task(display_task(state))
+                    tg.create_task(ping_task(state))
 
         asyncio.run(amain())
 
