@@ -54,7 +54,7 @@ WAIT_TIME = 10
 UP_COLOR = "#44cc44"
 """Color for online hosts."""
 
-DEGRADED_COLOR = "#cccc44"
+DEGRADED_COLOR = "#dd8844"
 """Color for degraded hosts."""
 
 DOWN_COLOR = "#cc4444"
@@ -105,13 +105,39 @@ class Host:
     """Unique ID for this target (not necessarily a network hostname)."""
 
     name: str
-    """Human readable name."""
+    """Human-readable name."""
 
     pinger: "PingImplementation"
     """Object that can be used to ping this host."""
 
     def __hash__(self):
         return self.id.__hash__()
+
+
+@dataclass
+class HostGroup:
+    """
+    Group of hosts.
+
+    It will be marked online if all hosts are online, offline if all hosts are
+    offline, pending if any host is pending, and degraded otherwise.
+    """
+
+    name: str
+    """Human-readable name."""
+
+    hosts: list[Host]
+    """Ordered list of hosts in this group."""
+
+    def group_state(self, states: dict[Host, HostState]):
+        my_states = [states[host] for host in self.hosts]
+        if any(isinstance(state, HostStatePending) for state in my_states):
+            return HostStatePending()
+        if all(isinstance(state, HostStateDown) for state in my_states):
+            return HostStateDown()
+        if all(isinstance(state, HostStateUp) for state in my_states):
+            return HostStateUp()
+        return HostStateDegraded()
 
 
 @dataclass
@@ -128,6 +154,7 @@ class PingerState:
     """Data to coordinate between coroutines."""
 
     hosts: list[Host]
+    groups: list[HostGroup]
     queue: asyncio.Queue[PingerEvent]
     finished: asyncio.Event
     http_session: aiohttp.ClientSession
@@ -159,6 +186,21 @@ def state_to_name(state: HostState) -> str:
             return "PENDING"
         case HostStateDegraded():
             return "DEGRADED"
+        case _:
+            assert_never(state)
+
+
+def state_to_name_rich(state: HostState) -> str:
+    """Convert state to readable name (Rich markup)."""
+    match state:
+        case HostStateUp():
+            return f"[bold {UP_COLOR}]ONLINE[/]"
+        case HostStateDown():
+            return f"[bold {DOWN_COLOR}]OFFLINE[/]"
+        case HostStatePending():
+            return f"[{PENDING_COLOR}](pending)[/]"
+        case HostStateDegraded():
+            return f"[bold {DEGRADED_COLOR}]DEGRADED[/]"
         case _:
             assert_never(state)
 
@@ -283,7 +325,7 @@ async def display_task(state: PingerState):
 
     def render_dashboard():
         """Render dashboard."""
-        panels = []
+        host_panels: dict[Host, Panel] = {}
         for host, hstate in states.items():
             tab = Table.grid(expand=True, padding=2)
             tab.add_column(justify="left")
@@ -292,8 +334,22 @@ async def display_task(state: PingerState):
                 f"[bold]{state.name_filter_rich(host.name)}[/]",
                 state_to_badge(hstate),
             )
-            panels.append(Panel(tab, box=rich.box.SQUARE))
-        return Columns(panels)
+            host_panels[host] = Panel(tab, box=rich.box.SQUARE)
+
+        group_panels: list[Panel] = []
+
+        for group in state.groups:
+            group_panels.append(
+                Panel.fit(
+                    Columns((host_panels[host] for host in group.hosts)),
+                    title=f"[italic]{state.name_filter_rich(group.name)} {state_to_name_rich(group.group_state(states))}[/]",
+                    title_align="center",
+                    box=rich.box.SQUARE,
+                    width=80,
+                )
+            )
+
+        return Columns(group_panels)
 
     with Live(render_dashboard(), refresh_per_second=4, screen=True) as live:
         while not state.finished.is_set():
@@ -323,9 +379,9 @@ class Pinger(cli.Application):
         default=False,
     )
 
-    def main(self, *hosts: str):
+    def main(self, *host_strs: str):
         async def amain():
-            if len(hosts) == 0:
+            if len(host_strs) == 0:
                 Pinger.help(self)
                 return 1
 
@@ -336,9 +392,15 @@ class Pinger(cli.Application):
                 name_filter = str.upper
                 name_filter_rich = lambda s: rich.markup.escape(str.upper(s))  # noqa: E731
 
+            hosts = []
+
+            cmd_hosts = [parse_host(host) for host in host_strs]
+            hosts += cmd_hosts
+
             async with aiohttp.ClientSession() as http_session:
                 state = PingerState(
-                    hosts=[parse_host(host) for host in hosts],
+                    hosts=cmd_hosts,
+                    groups=[HostGroup(name="Command Line", hosts=cmd_hosts)],
                     queue=asyncio.Queue(),
                     finished=asyncio.Event(),
                     http_session=http_session,
