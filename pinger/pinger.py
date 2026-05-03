@@ -175,6 +175,21 @@ async def notify(msg: str):
     await notify_send("-a", "Pinger", msg)
 
 
+def state_to_style(state: HostState) -> str:
+    """Get the Rich style for a state."""
+    match state:
+        case HostStateUp():
+            return f"[bold {UP_COLOR}]"
+        case HostStateDown():
+            return f"[bold {DOWN_COLOR}]"
+        case HostStatePending():
+            return f"[{PENDING_COLOR}]"
+        case HostStateDegraded():
+            return f"[bold {DEGRADED_COLOR}]"
+        case _:
+            assert_never(state)
+
+
 def state_to_name(state: HostState) -> str:
     """Convert state to readable name."""
     match state:
@@ -183,7 +198,7 @@ def state_to_name(state: HostState) -> str:
         case HostStateDown():
             return "OFFLINE"
         case HostStatePending():
-            return "PENDING"
+            return "(pending)"
         case HostStateDegraded():
             return "DEGRADED"
         case _:
@@ -192,37 +207,27 @@ def state_to_name(state: HostState) -> str:
 
 def state_to_name_rich(state: HostState) -> str:
     """Convert state to readable name (Rich markup)."""
-    match state:
-        case HostStateUp():
-            return f"[bold {UP_COLOR}]ONLINE[/]"
-        case HostStateDown():
-            return f"[bold {DOWN_COLOR}]OFFLINE[/]"
-        case HostStatePending():
-            return f"[{PENDING_COLOR}](pending)[/]"
-        case HostStateDegraded():
-            return f"[bold {DEGRADED_COLOR}]DEGRADED[/]"
-        case _:
-            assert_never(state)
+    return f"{state_to_style(state)}{state_to_name(state)}[/]"
 
 
 def state_to_badge(state: HostState) -> str:
-    """Convert state to badge in Rich console markup."""
-
-    def wrap(s: str):
-        # no-op for now, but can be used to turn `OK` into `[OK]`
-        return s
-
+    """Convert state to text badge."""
     match state:
         case HostStateUp():
-            return wrap(f"[bold {UP_COLOR}]OK[/]")
+            return "OK"
         case HostStateDown():
-            return wrap(f"[bold {DOWN_COLOR}]!![/]")
+            return "!!"
         case HostStatePending():
-            return wrap(f"[bold {PENDING_COLOR}]--[/]")
+            return "--"
         case HostStateDegraded():
-            return wrap(f"[bold {DEGRADED_COLOR}]!~[/]")
+            return "!~"
         case _:
             assert_never(state)
+
+
+def state_to_badge_rich(state: HostState) -> str:
+    """Convert state to badge in Rich console markup."""
+    return f"{state_to_style(state)}{state_to_badge(state)}[/]"
 
 
 def parse_host(host: str) -> Host:
@@ -332,7 +337,7 @@ async def display_task(state: PingerState):
             tab.add_column(justify="right")
             tab.add_row(
                 f"[bold]{state.name_filter_rich(host.name)}[/]",
-                state_to_badge(hstate),
+                state_to_badge_rich(hstate),
             )
             host_panels[host] = Panel(tab, box=rich.box.SQUARE)
 
