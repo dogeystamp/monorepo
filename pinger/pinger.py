@@ -359,11 +359,12 @@ class PingHTTP(PingImplementation):
     async def ping(self, _state: PingerState) -> HostState:
         session = _state.http_session
         try:
-            async with session.get(self.url) as resp:
+            async with session.get(self.url, timeout=aiohttp.ClientTimeout(total=WAIT_TIME)) as resp:
                 resp.raise_for_status()
                 resp.close()
-
         except aiohttp.client_exceptions.ClientError as err:
+            return HostStateDownHTTP(err=err)
+        except asyncio.TimeoutError as err:
             return HostStateDownHTTP(err=err)
         return HostStateUp()
 
