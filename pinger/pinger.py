@@ -25,20 +25,23 @@ To write a new ping implementation:
 - Add a case in [`parse_host`] to instantiate your implementation.
 """
 
-from typing import assert_never, Callable
-from dataclasses import dataclass
-from rich.panel import Panel
-from rich.table import Table
-from rich.columns import Columns
-from rich.live import Live
-import rich.box
-import rich.markup
 import asyncio
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Callable, assert_never
+from urllib.parse import urlparse
+
 import aiohttp
 import aiohttp.client_exceptions
-from abc import ABC, abstractmethod
-from plumbum import async_local, ProcessExecutionError, cli
-from urllib.parse import urlparse
+import rich.box
+import rich.markup
+import tomllib
+from plumbum import ProcessExecutionError, async_local, cli
+from rich.columns import Columns
+from rich.live import Live
+from rich.panel import Panel
+from rich.table import Table
 
 ping = async_local["ping"]
 notify_send = async_local["notify-send"]
@@ -158,12 +161,69 @@ class PingerState:
     queue: asyncio.Queue[PingerEvent]
     finished: asyncio.Event
     http_session: aiohttp.ClientSession
+    config: "PingerConfig"
 
     name_filter_rich: Callable[[str], str]
     """Function that filters host names into Rich markup."""
 
     name_filter: Callable[[str], str]
     """Function that filters host names into text."""
+
+
+# ----------------
+# CONFIGURATION
+# ----------------
+
+DEFAULT_CONFIG = """
+# pinger.py config.
+# To regenerate the default configuration, remove this file and re-run pinger.
+
+# Hosts to ping, divided into categories. Supports HTTP GET checks, and ICMP ping checks.
+# Arguments to pinger.py will be added as a separate category of hosts.
+[hosts]
+# "API endpoints" = ["https://api.example.com#My API", "https://api2.example.com#Another endpoint"]
+# "Ping hosts" = ["192.168.0.1#Important Host", "other-host"]
+
+[general]
+# Make names uppercase (for aesthetic reasons).
+upper = false
+"""
+
+
+@dataclass
+class PingerConfig:
+    """Config file data."""
+
+    hosts: list[Host]
+    categories: list[HostGroup]
+    upper: bool
+
+
+def get_config() -> PingerConfig:
+    """Read and parse configuration for this script."""
+    config_dir = Path.home() / ".config"
+    config_dir.mkdir(mode=700, parents=True, exist_ok=True)
+    config_file = config_dir / "pinger.toml"
+    if not config_file.exists():
+        config_file.write_text(DEFAULT_CONFIG.strip())
+    config = tomllib.loads(config_file.read_text())
+
+    upper = config.get("general", {}).get("upper", False)
+    assert type(upper) is bool
+    host_strs_dict = config.get("hosts", {})
+    assert type(host_strs_dict) is dict
+    groups = []
+    hosts = []
+    for group, host_strs in host_strs_dict.items():
+        host_objs = [parse_host(host) for host in host_strs]
+        groups.append(HostGroup(name=group, hosts=host_objs))
+        hosts += host_objs
+
+    return PingerConfig(
+        hosts=hosts,
+        upper=upper,
+        categories=groups,
+    )
 
 
 # ---------------------
@@ -236,6 +296,9 @@ def parse_host(host: str) -> Host:
 
     Use a hash symbol to set a friendly name for the host.
     """
+    if type(host) != str:
+        raise ValueError(f"'{host}' is not a valid host")
+
     parts = urlparse(host)
     name = parts.fragment or host
 
@@ -294,6 +357,7 @@ class PingHTTP(PingImplementation):
         try:
             async with session.get(self.url) as resp:
                 resp.raise_for_status()
+                resp.close()
 
         except aiohttp.client_exceptions.ClientError as err:
             return HostStateDownHTTP(err=err)
@@ -378,22 +442,31 @@ async def display_task(state: PingerState):
 
 
 class Pinger(cli.Application):
-    upper = cli.Flag(
-        ["-U", "--upper"],
-        help="Display all names uppercase. Improves coolness of dashboard.",
-        default=False,
-    )
+    """Ping utility."""
+
+    DESCRIPTION_MORE = """
+Specify hosts to ping as arguments. Can be IP hosts to ping using ICMP, or
+http:// endpoints to ping using HTTP. Use a # fragment at the end of the URL to
+assign a name to the host. For instance:
+
+    pinger.py 192.168.0.1 "https://api.example.com#My API endpoint"
+
+Options are all specified in the config file, at ~/.config/pinger.toml.
+The config file will be generated if it doesn't exist.
+"""
 
     def main(self, *host_strs: str):
         async def amain():
-            if len(host_strs) == 0:
+            config = get_config()
+
+            if len(config.hosts) == 0:
                 Pinger.help(self)
                 return 1
 
             name_filter = lambda s: s  # noqa: E731
             name_filter_rich = rich.markup.escape
 
-            if self.upper:
+            if config.upper:
                 name_filter = str.upper
                 name_filter_rich = lambda s: rich.markup.escape(str.upper(s))  # noqa: E731
 
@@ -401,16 +474,23 @@ class Pinger(cli.Application):
 
             cmd_hosts = [parse_host(host) for host in host_strs]
             hosts += cmd_hosts
+            hosts += config.hosts
 
             async with aiohttp.ClientSession() as http_session:
                 state = PingerState(
-                    hosts=cmd_hosts,
-                    groups=[HostGroup(name="Command Line", hosts=cmd_hosts)],
+                    hosts=hosts,
+                    groups=(
+                        [HostGroup(name="Command Line", hosts=cmd_hosts)]
+                        if len(cmd_hosts)
+                        else []
+                    )
+                    + config.categories,
                     queue=asyncio.Queue(),
                     finished=asyncio.Event(),
                     http_session=http_session,
                     name_filter=name_filter,
                     name_filter_rich=name_filter_rich,
+                    config=config,
                 )
 
                 async with asyncio.TaskGroup() as tg:
