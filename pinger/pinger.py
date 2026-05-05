@@ -119,12 +119,7 @@ class Host:
 
 @dataclass
 class HostGroup:
-    """
-    Group of hosts.
-
-    It will be marked online if all hosts are online, offline if all hosts are
-    offline, pending if any host is pending, and degraded otherwise.
-    """
+    """Group of hosts."""
 
     name: str
     """Human-readable name."""
@@ -132,15 +127,8 @@ class HostGroup:
     hosts: list[Host]
     """Ordered list of hosts in this group."""
 
-    def group_state(self, states: dict[Host, HostState]):
-        my_states = [states[host] for host in self.hosts]
-        if any(isinstance(state, HostStatePending) for state in my_states):
-            return HostStatePending()
-        if all(isinstance(state, HostStateDown) for state in my_states):
-            return HostStateDown()
-        if all(isinstance(state, HostStateUp) for state in my_states):
-            return HostStateUp()
-        return HostStateDegraded()
+    def group_state(self, states: dict[Host, HostState]) -> HostState:
+        return state_accumulate([states[host] for host in self.hosts])
 
 
 @dataclass
@@ -290,13 +278,29 @@ def state_to_badge_rich(state: HostState) -> str:
     return f"{state_to_style(state)}{state_to_badge(state)}[/]"
 
 
+def state_accumulate(states: list[HostState]) -> HostState:
+    """
+    Provide a single status for a group of hosts.
+
+    A group will be marked online if all hosts are online, offline if all hosts are
+    offline, pending if any host is pending, and degraded otherwise.
+    """
+    if any(isinstance(state, HostStatePending) for state in states):
+        return HostStatePending()
+    if all(isinstance(state, HostStateDown) for state in states):
+        return HostStateDown()
+    if all(isinstance(state, HostStateUp) for state in states):
+        return HostStateUp()
+    return HostStateDegraded()
+
+
 def parse_host(host: str) -> Host:
     """
     Parse a host string into a [Host] object.
 
     Use a hash symbol to set a friendly name for the host.
     """
-    if type(host) != str:
+    if type(host) is not str:
         raise ValueError(f"'{host}' is not a valid host")
 
     parts = urlparse(host)
@@ -406,19 +410,27 @@ async def display_task(state: PingerState):
             host_panels[host] = Panel(tab, box=rich.box.SQUARE)
 
         group_panels: list[Panel] = []
+        group_states: list[HostState] = []
 
         for group in state.groups:
+            group_state = group.group_state(states)
+            group_states.append(group_state)
             group_panels.append(
                 Panel.fit(
                     Columns((host_panels[host] for host in group.hosts)),
-                    title=f"[italic]{state.name_filter_rich(group.name)} {state_to_name_rich(group.group_state(states))}[/]",
+                    title=f"[italic]{state.name_filter_rich(group.name)} {state_to_name_rich(group_state)}[/]",
                     title_align="center",
                     box=rich.box.SQUARE,
                     width=80,
                 )
             )
 
-        return Columns(group_panels)
+        all_state = state_accumulate(group_states)
+
+        header = "[bold]Pinger.py[/]\n\n" \
+            f"{state.name_filter_rich('All targets')}:  {state_to_name_rich(all_state)} {state_to_style(all_state)} {'█' * 5}[/]\n\n"
+
+        return rich.console.Group(header, Columns(group_panels))
 
     with Live(render_dashboard(), refresh_per_second=4, screen=True) as live:
         while not state.finished.is_set():
