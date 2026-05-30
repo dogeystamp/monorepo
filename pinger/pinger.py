@@ -440,9 +440,7 @@ async def display_task(state: PingerState):
                 case EventChange(host=host, new_state=new_state):
                     old_state = states[host]
                     states[host] = new_state
-                    if not isinstance(old_state, HostStatePending) or isinstance(
-                        new_state, HostStateDown
-                    ):
+                    if not isinstance(old_state, HostStatePending):
                         await notify(
                             f"{state.name_filter(host.name)} is now {state_to_name(new_state)}"
                         )
