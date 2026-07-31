@@ -104,7 +104,11 @@ fn main() {
         PathBuf::from(std::env::var("XDG_DATA_HOME").expect("XDG_DATA_HOME should be set"))
             .join("timer");
     let _ = std::fs::create_dir(&state_dir);
-    let state_file = state_dir.join("timer.json");
+    let state_file = if cfg!(not(debug_assertions)) {
+        state_dir.join("timer.json")
+    } else {
+        state_dir.join("timer-staging.json")
+    };
 
     let mut state = read_state(&state_file).unwrap_or_default();
 
