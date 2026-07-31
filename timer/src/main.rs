@@ -3,7 +3,7 @@ use std::{
     time::Duration,
 };
 
-use chrono::{DateTime, Local};
+use chrono::Local;
 use clap::{Parser, Subcommand};
 use serde::{Deserialize, Serialize};
 
@@ -13,22 +13,44 @@ struct Task {
     name: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-struct Period {
-    start_time: chrono::DateTime<Local>,
-    duration: Duration,
+#[derive(Serialize, Deserialize, Debug, Default)]
+enum Session {
+    /// Time is ticking
+    Ongoing {
+        start_time: chrono::DateTime<Local>,
+        duration: Duration,
+    },
+    #[default]
+    /// No tracking
+    Stopped,
 }
 
-impl Period {
-    fn get_end_time(&self) -> DateTime<Local> {
-        self.start_time + self.duration
+impl Session {
+    /// Side-effectful update
+    fn update(self) -> Self {
+        match self {
+            Session::Ongoing {
+                start_time,
+                duration,
+            } => {
+                let end = start_time + duration;
+                let now = chrono::offset::Local::now();
+                if now < end {
+                    self
+                } else {
+                    trigger_finish_actions();
+                    Session::Stopped {}
+                }
+            }
+            Session::Stopped => self,
+        }
     }
 }
 
 #[derive(Serialize, Deserialize, Default, Debug)]
 struct State {
     current_task: Option<Task>,
-    current_session: Option<Period>,
+    current_session: Session,
 }
 
 fn read_state(state_file: &Path) -> Option<State> {
@@ -50,11 +72,31 @@ enum Command {
     /// Start break timer
     Start {
         /// Duration in minutes
-        #[arg(default_value = "60")]
+        #[arg(default_value = "0")]
         duration: u64,
     },
     /// Get break/task status
     Status {},
+}
+
+/// Trigger finishing actions.
+///
+/// Actions should be idempotent.
+fn trigger_finish_actions() {
+    std::process::Command::new("timer-action.sh")
+        .arg("finish")
+        .output()
+        .unwrap();
+}
+
+/// Trigger starting actions.
+///
+/// Actions should be idempotent.
+fn trigger_start_actions() {
+    std::process::Command::new("timer-action.sh")
+        .arg("start")
+        .output()
+        .unwrap();
 }
 
 fn main() {
@@ -69,16 +111,28 @@ fn main() {
     let cli = Cli::parse();
     match cli.command {
         Command::Start { duration } => {
-            state.current_session = Some(Period {
+            trigger_start_actions();
+            state.current_session = Session::Ongoing {
                 start_time: chrono::offset::Local::now(),
                 duration: Duration::from_mins(duration),
-            })
+            }
         }
         Command::Status {} => {
-            if let Some(ref session) = state.current_session {
-                let delta = session.get_end_time() - chrono::offset::Local::now();
-                let secs = delta.num_seconds();
-                println!("session: {:>02}:{:>02} remaining", secs / 60, secs % 60,);
+            state.current_session = state.current_session.update();
+            match state.current_session {
+                Session::Ongoing {
+                    start_time,
+                    duration,
+                } => {
+                    let end = start_time + duration;
+                    let now = chrono::offset::Local::now();
+                    let delta = end - now;
+                    let secs = delta.num_seconds();
+                    println!("session: {:>02}:{:>02} remaining", secs / 60, secs % 60,);
+                }
+                Session::Stopped => {
+                    println!("session: no tracking")
+                }
             }
         }
     }
