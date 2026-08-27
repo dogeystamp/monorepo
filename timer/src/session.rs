@@ -14,22 +14,10 @@ pub enum Session {
 }
 
 impl Session {
-    pub fn update(
-        &mut self,
-        input_action: SessionAction,
-    ) -> Result<Option<OutputAction>, crate::errors::Error> {
-        self.update_at_time(input_action, jiff::Zoned::now())
-    }
-
-    pub fn status(&self) -> SessionStatus {
-        let now = jiff::Zoned::now();
-        self.status_at_time(now)
-    }
-
-    fn update_at_time(
+    pub fn update_at_time(
         &mut self,
         session_action: SessionAction,
-        now: jiff::Zoned,
+        now: &jiff::Zoned,
     ) -> Result<Option<OutputAction>, crate::errors::Error> {
         let old_session = std::mem::take(self);
         let result = match session_action {
@@ -59,7 +47,7 @@ impl Session {
                 ))
             }
             SessionAction::Stop => Ok((Session::Stopped, Some(OutputAction::SessionEnd))),
-            SessionAction::None => match old_session.status() {
+            SessionAction::None => match old_session.status_at_time(now) {
                 SessionStatus::Ongoing { end_time, .. } => {
                     if now < end_time {
                         Ok((old_session, None))
@@ -75,7 +63,7 @@ impl Session {
         Ok(output_action)
     }
 
-    fn status_at_time(&self, now: jiff::Zoned) -> SessionStatus {
+    pub fn status_at_time(&self, now: &jiff::Zoned) -> SessionStatus {
         // this function should never be expensive to compute
         match &self {
             Session::Ongoing {

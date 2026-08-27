@@ -2,25 +2,14 @@ use std::path::PathBuf;
 
 use clap::Parser;
 use timer::{
-    actions::{ActionRunner, ScriptActionRunnerImpl},
-    cli::Command,
+    actions::{ActionRunner, OutputAction, ScriptActionRunnerImpl},
+    cli::{Args, Command},
     session::{SessionAction, SessionStatus},
-    state::read_state,
+    state::{State, read_state},
 };
 
-fn format_span(span: jiff::Span) -> String {
-    let rounded = span
-        .round(jiff::SpanRound::new().largest(jiff::Unit::Minute))
-        .unwrap();
-    format!(
-        "{:>02}:{:>02}",
-        rounded.get_minutes(),
-        rounded.get_seconds()
-    )
-}
-
 fn main() {
-    let cli = timer::cli::Cli::parse();
+    let args = timer::cli::Args::parse();
 
     let state_dir =
         PathBuf::from(std::env::var("XDG_DATA_HOME").expect("XDG_DATA_HOME should be set"))
@@ -35,7 +24,52 @@ fn main() {
     let mut state = read_state(&state_file).unwrap_or_default();
     let mut runner = ScriptActionRunnerImpl::default();
 
-    let session_action = match cli.command {
+    let now = jiff::Zoned::now();
+    let output = run(
+        AppInput {
+            state: &mut state,
+            now: &now,
+            args,
+        },
+        &mut std::io::stdout(),
+    );
+
+    if let Some(action) = output.action {
+        runner.run(action);
+        std::fs::write(state_file, serde_json::to_string(&state).unwrap()).unwrap();
+    }
+}
+
+struct AppInput<'a> {
+    state: &'a mut State,
+    now: &'a jiff::Zoned,
+    args: Args,
+}
+
+struct AppOutput {
+    action: Option<OutputAction>,
+}
+
+fn format_span(span: jiff::Span) -> String {
+    let rounded = span
+        .round(jiff::SpanRound::new().largest(jiff::Unit::Minute))
+        .unwrap();
+    format!(
+        "{:>02}:{:>02}",
+        rounded.get_minutes(),
+        rounded.get_seconds()
+    )
+}
+
+/// Core app logic.
+fn run(input: AppInput, stdout: &mut impl std::io::Write) -> AppOutput {
+    let AppInput { state, now, args } = input;
+
+    if args.verbose {
+        writeln!(stdout, "input state: {state:#?}").unwrap();
+    }
+
+    let session_action = match args.command {
         Command::Start { duration } => SessionAction::Start {
             duration: jiff::Span::new().minutes(duration),
         },
@@ -46,22 +80,19 @@ fn main() {
 
     let action = state
         .current_session
-        .update(session_action)
+        .update_at_time(session_action, now)
         .unwrap_or_else(|e| panic!("{e}"));
-    if let Some(action) = action {
-        runner.run(action);
-    }
 
-    match cli.command {
-        Command::Short {} => match state.current_session.status() {
+    match args.command {
+        Command::Short {} => match state.current_session.status_at_time(now) {
             SessionStatus::Ongoing { until_end, .. } => {
-                println!("{}", format_span(until_end));
+                writeln!(stdout, "{}", format_span(until_end)).unwrap();
             }
-            SessionStatus::Stopped => println!("--:--"),
+            SessionStatus::Stopped => writeln!(stdout, "--:--").unwrap(),
         },
         _ => {
-            println!("SESSION");
-            match state.current_session.status() {
+            writeln!(stdout, "SESSION").unwrap();
+            match state.current_session.status_at_time(now) {
                 SessionStatus::Ongoing {
                     until_end,
                     duration,
@@ -69,27 +100,30 @@ fn main() {
                     end_time,
                     ..
                 } => {
-                    println!(
+                    writeln!(
+                        stdout,
                         "{} -> {} ({:#})",
                         start_time.strftime("%H:%M"),
                         end_time.strftime("%H:%M"),
                         duration.round(jiff::Unit::Minute).unwrap(),
-                    );
-                    println!(
+                    )
+                    .unwrap();
+                    writeln!(
+                        stdout,
                         "{:#} remaining",
                         until_end.round(jiff::Unit::Minute).unwrap()
-                    );
+                    )
+                    .unwrap();
                 }
-                SessionStatus::Stopped => {
-                    println!("no tracking")
-                }
+                SessionStatus::Stopped => writeln!(stdout, "no tracking").unwrap(),
             }
         }
     }
 
-    if cli.verbose {
-        println!("{state:#?}");
+    if args.verbose {
+        writeln!(stdout, "output state: {state:#?}").unwrap();
+        writeln!(stdout, "action: {action:#?}").unwrap();
     }
 
-    std::fs::write(state_file, serde_json::to_string(&state).unwrap()).unwrap();
+    AppOutput { action }
 }
